@@ -303,8 +303,12 @@ TTImp.Elab.Check.check rigc elabinfo nest env tm_in exp
          case elabMode elabinfo of
               InLHS _ => -- Don't expand implicit lambda on lhs
                  checkImp rigc elabinfo nest env tm exp
-              _ => do -- Two-level type theory: insert quotations and
-                      -- splices the types tell us we need
+              _ => do -- Two-level type theory: the argument of 'Code' is
+                      -- an object level type
+                      Nothing <- isCodeApp tm
+                          | Just (fc, arg) => checkCodeApp rigc elabinfo nest env fc arg exp
+                      -- Insert quotations and splices the types tell us
+                      -- we need
                       tm <- insertStageCoercion nest env tm exp
                       tm' <- insertImpLam env tm exp
                       checkImp rigc elabinfo nest env tm' exp

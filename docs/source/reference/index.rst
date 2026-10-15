@@ -28,3 +28,4 @@ This is a placeholder, to get set up with readthedocs.
    builtins
    debugging
    failing
+   staging

@@ -398,6 +398,14 @@ mutual
            -- Add the definition first, so that recursive calls find it
            ignore $ addDef sn (newDef fc sn top Scope.empty fty (specified Public) None)
            clauses <- traverse (specClause fvs fvEnv fvBounds) pats
+           -- Extra arguments which turned out not to be used at run time are
+           -- erased (e.g. the code of an argument that was only used in a
+           -- type)
+           let nfvs = length fvTys
+           let used = concatMap usedFvs clauses
+           let unused = filter (\j => not (j `elem` used)) [0 .. minus nfvs 1]
+           let fty = eraseArgsTy (if nfvs == 0 then [] else unused) 0 fty
+           ignore $ addDef sn (newDef fc sn top Scope.empty fty (specified Public) None)
            (cargs ** (tree_ct, _)) <- getPMDef fc (CompileTime top) sn fty clauses
            rclauses <- traverse eraseClause clauses
            (rargs ** (tree_rt, _)) <- getPMDef fc RunTime sn fty rclauses
@@ -418,6 +426,17 @@ mutual
     where
       toPats : Clause -> (vs ** (Env Term vs, Term vs, Term vs))
       toPats (MkClause env lhs rhs) = (_ ** (env, lhs, rhs))
+
+      -- The extra arguments (by position) used by the right hand side of a
+      -- clause. They are the outermost variables of the clause.
+      usedFvs : Clause -> List Nat
+      usedFvs (MkClause {vars} env lhs rhs)
+          = let nfvs = length fvTys
+                nvs = minus (length vars) nfvs in
+                mapMaybe (\i => if i >= nvs && i < length vars
+                                   then Just (minus (minus nfvs 1) (minus i nvs))
+                                   else Nothing)
+                         (freeIdxs 0 rhs)
 
       eraseClause : Clause -> Core Clause
       eraseClause (MkClause env lhs rhs)

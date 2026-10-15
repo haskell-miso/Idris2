@@ -109,8 +109,6 @@ findBindableNames arg env used (IForce fc t)
     = findBindableNames arg env used t
 findBindableNames arg env used (IStageQuote fc t)
     = findBindableNames arg env used t
-findBindableNames arg env used (IUnquote fc t)
-    = findBindableNames arg env used t
 findBindableNames arg env used (IQuote fc t)
     = findBindableNamesQuot env used t
 findBindableNames arg env used (IQuoteDecl fc d)

@@ -68,7 +68,13 @@ replaceHead new (INamedApp fc f n a) = INamedApp fc (replaceHead new f) n a
 replaceHead new f = new
 
 -- What sort of type a function returns, after some explicit arguments
-data ResultKind = RCode | RVar | RConcrete | RUnknown
+data ResultKind
+   = RCode
+   | RCodeOver Nat -- returns code after this many arguments, and has more
+   | RFunCode Nat -- a function returning code after this many more arguments
+   | RVar
+   | RConcrete
+   | RUnknown
 
 -- What we know about the head of an application
 record HeadInfo where
@@ -84,10 +90,25 @@ resultKind : {vars : _} ->
              Env Term vars -> Nat -> NF vars -> Core (ResultKind, Bool)
 resultKind env n ty = go n False ty
   where
+    -- How many more explicit arguments until the result is 'Code'?
+    codeAfter : Nat -> NF vars -> Core (Maybe Nat)
+    codeAfter m (NBind fc x (Pi _ _ Explicit aty) sc)
+        = do defs <- get Ctxt
+             sc' <- sc defs (toClosure defaultOpts env (Erased fc Placeholder))
+             codeAfter (S m) sc'
+    codeAfter m (NBind fc x (Pi _ _ _ aty) sc)
+        = do defs <- get Ctxt
+             sc' <- sc defs (toClosure defaultOpts env (Erased fc Placeholder))
+             codeAfter m sc'
+    codeAfter m nf
+        = if isJust !(isCodeNF nf) then pure (Just m) else pure Nothing
+
     go : Nat -> Bool -> NF vars -> Core (ResultKind, Bool)
-    go k cons (NBind fc x (Pi _ _ Explicit aty) sc)
+    go k cons nf@(NBind fc x (Pi _ _ Explicit aty) sc)
         = case k of
-               Z => pure (RConcrete, cons) -- a function is not code
+               Z => do Just m <- codeAfter Z nf
+                            | Nothing => pure (RConcrete, cons) -- a function is not code
+                       pure (RFunCode m, cons)
                S k' => do defs <- get Ctxt
                           sc' <- sc defs (toClosure defaultOpts env (Erased fc Placeholder))
                           go k' cons sc'
@@ -99,7 +120,11 @@ resultKind env n ty = go n False ty
         = do defs <- get Ctxt
              sc' <- sc defs (toClosure defaultOpts env (Erased fc Placeholder))
              go k cons sc'
-    go (S _) cons _ = pure (RUnknown, cons)
+    go (S k) cons nf
+        = do Just _ <- isCodeNF nf
+                  | Nothing => pure (RUnknown, cons)
+             -- code applied to more arguments
+             pure (RCodeOver (minus n (S k)), cons)
     go Z cons nf
         = do Nothing <- isCodeNF nf
                   | Just _ => pure (RCode, cons)
@@ -173,6 +198,42 @@ headInfo nest env (IVar fc n) nargs
              pure (Just (MkHeadInfo s res False cons))
 headInfo nest env _ _ = pure Nothing
 
+isOver : ResultKind -> Bool
+isOver (RCodeOver _) = True
+isOver _ = False
+
+-- Is this a meta level expression whose value is code?
+isCodeExpr : {vars : _} ->
+             {auto c : Ref Ctxt Defs} ->
+             {auto u : Ref UST UState} ->
+             NestedNames vars -> Env Term vars -> RawImp -> Core Bool
+isCodeExpr nest env tm
+    = do let (hd, nargs) = getHead tm Z
+         Just info <- headInfo nest env hd nargs
+              | Nothing => pure False
+         case info.result of
+              RCode => pure True
+              _ => pure (info.isCodeVal && nargs == 0)
+
+-- Is this a meta level expression whose value is not code (e.g. a meta level
+-- variable of type 'Nat')? A case on it, at the object level, is a compile
+-- time choice between pieces of code.
+isMetaNonCode : {vars : _} ->
+                {auto c : Ref Ctxt Defs} ->
+                {auto u : Ref UST UState} ->
+                NestedNames vars -> Env Term vars -> RawImp -> Core Bool
+isMetaNonCode nest env tm
+    = do let (hd, nargs) = getHead tm Z
+         Just info <- headInfo nest env hd nargs
+              | Nothing => pure False
+         case info.stage of
+              Just SMeta =>
+                 case info.result of
+                      RConcrete => pure (not info.isCodeVal)
+                      RVar => pure (not info.isCodeVal)
+                      _ => pure False
+              _ => pure False
+
 -- Can this expression, checked against 'Code a' at the meta level, not have
 -- that type as it is? Then it's object code, and needs quoting.
 mustQuote : {vars : _} ->
@@ -181,6 +242,10 @@ mustQuote : {vars : _} ->
             NestedNames vars -> Env Term vars -> RawImp -> Core Bool
 mustQuote nest env (IPrimVal _ _) = pure True
 mustQuote nest env (ILam {}) = pure True
+mustQuote nest env (IPi {}) = pure True
+mustQuote nest env (IType {}) = pure True
+-- a case (or if) on code is object level
+mustQuote nest env (ICase _ _ scr _ _) = isCodeExpr nest env scr
 mustQuote nest env (IAlternative _ _ (alt :: _)) = mustQuote nest env alt
 mustQuote nest env tm
     = do let (hd, nargs) = getHead tm Z
@@ -192,31 +257,85 @@ mustQuote nest env tm
               Just SObj => pure True -- object code used at the meta level
               Just SMeta =>
                   -- code applied to arguments is an object application
-                  pure (info.isCodeVal && nargs > 0)
+                  pure ((info.isCodeVal && nargs > 0) || isOver info.result)
               Nothing =>
                   case info.result of
                        RCode => pure False
+                       RCodeOver _ => pure True
+                       RFunCode _ => pure False
                        RConcrete => pure True
                        RVar => pure info.constrained
                        RUnknown => pure False
 
+-- Application spines
+data AppArg = AExp FC RawImp | AAuto FC RawImp | ANamed FC Name RawImp
+
+spine : RawImp -> List AppArg -> (RawImp, List AppArg)
+spine (IApp fc f a) acc = spine f (AExp fc a :: acc)
+spine (IAutoApp fc f a) acc = spine f (AAuto fc a :: acc)
+spine (INamedApp fc f n a) acc = spine f (ANamed fc n a :: acc)
+spine f acc = (f, acc)
+
+rebuild : RawImp -> List AppArg -> RawImp
+rebuild f [] = f
+rebuild f (AExp fc a :: as) = rebuild (IApp fc f a) as
+rebuild f (AAuto fc a :: as) = rebuild (IAutoApp fc f a) as
+rebuild f (ANamed fc n a :: as) = rebuild (INamedApp fc f n a) as
+
+-- Split the arguments after 'k' explicit arguments
+splitExplicit : Nat -> List AppArg -> (List AppArg, List AppArg)
+splitExplicit Z as = ([], as)
+splitExplicit (S k) [] = ([], [])
+splitExplicit (S k) (AExp fc a :: as)
+    = let (xs, ys) = splitExplicit k as in (AExp fc a :: xs, ys)
+splitExplicit (S k) (a :: as)
+    = let (xs, ys) = splitExplicit (S k) as in (a :: xs, ys)
+
 -- Is this a meta level expression with a 'Code' result, used at the object
--- level? Then it needs splicing (Left), or its head does (Right)
+-- level? Then it needs splicing: return the expression with the splice
+-- inserted
 needsSplice : {vars : _} ->
               {auto c : Ref Ctxt Defs} ->
               {auto u : Ref UST UState} ->
               NestedNames vars -> Env Term vars -> RawImp ->
-              Core (Maybe (Either () ()))
-needsSplice nest env tm
+              Maybe (Glued vars) ->
+              Core (Maybe RawImp)
+needsSplice nest env tm@(ICase fc _ scr _ _) exp
+    = if !(isMetaNonCode nest env scr)
+         then pure (Just (IUnquote fc tm))
+         else pure Nothing
+needsSplice nest env tm exp
     = do let (hd, nargs) = getHead tm Z
          Just info <- headInfo nest env hd nargs
               | Nothing => pure Nothing
+         let fc = getFC tm
          case info.stage of
               Just SMeta =>
                  if info.isCodeVal && nargs > 0
-                    then pure (Just (Right ()))
+                    then -- code applied to arguments: splice the head
+                         pure (Just (replaceHead (IUnquote (getFC hd) hd) tm))
                     else case info.result of
-                              RCode => pure (Just (Left ()))
+                              RCode => pure (Just (IUnquote fc tm))
+                              RCodeOver k =>
+                                 -- code applied to more arguments: splice
+                                 -- the code part
+                                 do let (f, args) = spine tm []
+                                    let (pre, post) = splitExplicit k args
+                                    let pre' = rebuild f pre
+                                    pure (Just (rebuild (IUnquote (getFC pre') pre') post))
+                              RFunCode m =>
+                                 -- a meta level function on code, where an
+                                 -- object level function is expected:
+                                 -- eta expand it
+                                 do Just expty <- pure exp
+                                         | Nothing => pure Nothing
+                                    NBind {} <- getNF expty
+                                         | _ => pure Nothing
+                                    ns <- traverse (\_ => genVarName "eta") [1 .. m]
+                                    let body = foldl (\f, n => IApp fc f (IVar fc n)) tm ns
+                                    pure (Just (foldr (\n, sc => ILam fc top Explicit (Just n)
+                                                                     (Implicit fc False) sc)
+                                                      body ns))
                               _ => pure Nothing
               _ => pure Nothing
 
@@ -241,6 +360,9 @@ insertStageCoercion : {vars : _} ->
                       {auto u : Ref UST UState} ->
                       NestedNames vars -> Env Term vars ->
                       RawImp -> Maybe (Glued vars) -> Core RawImp
+insertStageCoercion nest env (IAlternative fc alt alts) exp
+    = -- each alternative gets the coercions it needs
+      pure (IAlternative fc alt !(traverse (\a => insertStageCoercion nest env a exp) alts))
 insertStageCoercion nest env tm exp
     = if isExplicitStaging tm then pure tm else
       do defs <- get Ctxt
@@ -265,14 +387,10 @@ insertStageCoercion nest env tm exp
                                pure (IStageQuote fc tm)
                        else pure tm
               Just SObj =>
-                 case !(needsSplice nest env tm) of
-                      Just (Left ()) =>
-                         do log "elab.stage" 5 $ "Inserting splice around " ++ show tm
-                            pure (IUnquote fc tm)
-                      Just (Right ()) =>
-                         do let (hd, _) = getHead tm Z
-                            log "elab.stage" 5 $ "Inserting splice around the head of " ++ show tm
-                            pure (replaceHead (IUnquote (getFC hd) hd) tm)
+                 case !(needsSplice nest env tm exp) of
+                      Just tm' =>
+                         do log "elab.stage" 5 $ "Inserting splice: " ++ show tm'
+                            pure tm'
                       Nothing => pure tm
               Nothing =>
                  -- The definition's stage isn't known yet. A meta level
@@ -285,8 +403,7 @@ insertStageCoercion nest env tm exp
                          NApp _ (NMeta {}) _ => pure tm -- don't know yet
                          _ => do Nothing <- isCodeNF expnf
                                       | Just _ => pure tm
-                                 Just (Left ()) <- needsSplice nest env tm
+                                 Just tm' <- needsSplice nest env tm exp
                                       | _ => pure tm
-                                 log "elab.stage" 5 $ "Inserting splice around " ++ show tm
-                                 requireStage fc "A splice" SObj
-                                 pure (IUnquote fc tm)
+                                 log "elab.stage" 5 $ "Inserting splice: " ++ show tm'
+                                 pure tm'

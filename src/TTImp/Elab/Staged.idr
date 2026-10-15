@@ -108,3 +108,41 @@ checkStageSplice rig elabinfo nest env fc tm exp
          (tm', _) <- inStage (length vars) SMeta $
                        check rig elabinfo nest env tm (Just (gnf env cty))
          pure (TSplice fc tm', gnf env aty)
+
+||| Is this an application of the 'Code' type constructor to an argument?
+export
+isCodeApp : {auto c : Ref Ctxt Defs} ->
+            RawImp -> Core (Maybe (FC, RawImp))
+isCodeApp (IApp fc (IVar vfc n) arg)
+    = do defs <- get Ctxt
+         Just _ <- lookupCtxtExact codeName (gamma defs)
+              | Nothing => pure Nothing
+         [(_, _, gdef)] <- lookupCtxtName n (gamma defs)
+              | _ => pure Nothing
+         if !(getFullName gdef.fullname) == codeName
+            then pure (Just (fc, arg))
+            else pure Nothing
+isCodeApp _ = pure Nothing
+
+||| 'Code a' is a meta level type, and 'a' is an object level type, so check
+||| 'a' at the object level
+export
+checkCodeApp : {vars : _} ->
+               {auto c : Ref Ctxt Defs} ->
+               {auto m : Ref MD Metadata} ->
+               {auto u : Ref UST UState} ->
+               {auto e : Ref EST (EState vars)} ->
+               {auto s : Ref Syn SyntaxInfo} ->
+               {auto o : Ref ROpts REPLOpts} ->
+               RigCount -> ElabInfo ->
+               NestedNames vars -> Env Term vars ->
+               FC -> RawImp -> Maybe (Glued vars) ->
+               Core (Term vars, Glued vars)
+checkCodeApp rig elabinfo nest env fc arg exp
+    = do requireStage fc "The type 'Code'" SMeta
+         u <- uniVar fc
+         (argtm, _) <- inStage (length vars) SObj $
+                         check erased elabinfo nest env arg (Just (gType fc u))
+         cty <- mkCodeType fc argtm
+         u' <- uniVar fc
+         checkExp rig elabinfo env fc cty (gType fc u') exp

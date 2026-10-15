@@ -118,6 +118,9 @@ idrisTestsSchemeEval = testsInDir "idris2/schemeeval" "Scheme Evaluator"
 idrisTestsReflection : IO TestPool
 idrisTestsReflection = testsInDir "idris2/reflection" "Quotation and Reflection"
 
+idrisTestsStaging : IO TestPool
+idrisTestsStaging = testsInDir "idris2/staging" "Two-level type theory: staged compilation"
+
 idrisTestsWith : IO TestPool
 idrisTestsWith = testsInDir "idris2/with" "With abstraction"
 
@@ -209,6 +212,7 @@ main = (runner =<<) $ sequence $
   , idrisTestsTotality
   , idrisTestsSchemeEval
   , idrisTestsReflection
+  , idrisTestsStaging
   , idrisTestsWith
   , idrisTestsOperators
   , idrisTestsDebug
