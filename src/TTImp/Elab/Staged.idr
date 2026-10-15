@@ -83,8 +83,9 @@ checkStageQuote rig elabinfo nest env fc tm exp
          (tm', gty) <- inStage (length vars) SObj $
                          check rig elabinfo nest env tm (Just (gnf env aty))
          ty <- getTerm gty
+         cty <- mkCodeType fc ty
          checkExp rig elabinfo env fc (TQuote fc ty tm')
-                  (gnf env (codeType fc ty)) exp
+                  (gnf env cty) exp
 
 export
 checkStageSplice : {vars : _} ->
@@ -103,7 +104,7 @@ checkStageSplice rig elabinfo nest env fc tm exp
          requireStage fc "A splice ~(...)" SObj
          updateStageState { usedSplice := True }
          aty <- maybe (newTypeMeta fc env "spliceTy") getTerm exp
+         cty <- mkCodeType fc aty
          (tm', _) <- inStage (length vars) SMeta $
-                       check rig elabinfo nest env tm
-                             (Just (gnf env (codeType fc aty)))
+                       check rig elabinfo nest env tm (Just (gnf env cty))
          pure (TSplice fc tm', gnf env aty)

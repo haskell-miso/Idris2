@@ -14,6 +14,7 @@ import Idris.Syntax
 import TTImp.BindImplicits
 import TTImp.Elab.Check
 import TTImp.Elab.Utils
+import TTImp.Elab.Stage
 import TTImp.Elab
 import TTImp.TTImp
 
@@ -102,7 +103,7 @@ checkCon {vars} opts nest env vis tn_in tn ty_raw
              | Just gdef => throw (AlreadyDefined fc cn)
          u <- uniVar fc
          ty <-
-             wrapErrorC opts (InCon cn_in) $
+             wrapErrorC opts (InCon cn_in) $ noStageCheck $
                    checkTerm !(resolveName cn) InType opts nest env
                               (IBindHere fc (PI erased) ty_raw)
                               (gType fc u)
@@ -559,6 +560,12 @@ processData {vars} eopts nest env fc def_vis mbtot (MkImpData dfc n_in mty_raw o
 
          calcConInfo fc (Resolved tidx) cons
          traverse_ updateErasable (Resolved tidx :: connames)
+
+         -- Two-level type theory: constructors with fields mentioning 'Code'
+         -- only exist at compile time
+         for_ cons $ \ con =>
+              when !(isMetaType Env.empty con.val) $
+                   setStage fc con.name.val DMeta
 
          -- #1404
          whenJust tot $ \ tot => do

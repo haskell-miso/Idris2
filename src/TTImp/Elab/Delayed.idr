@@ -9,6 +9,7 @@ import Core.Unify
 import Core.Value
 
 import TTImp.Elab.Check
+import TTImp.Elab.Stage
 
 import Libraries.Data.IntMap
 import Libraries.Data.NameMap
@@ -79,6 +80,8 @@ delayOnFailure fc rig env exp pred pri elab
                                       " for") env expected
                          log "elab.delay" 10 ("Due to error " ++ show err)
                          defs <- get Ctxt
+                         -- run it later at the same stage (2LTT)
+                         frames <- saveFrames
                          update UST { delayedElab $=
                                  ((pri, ci, localHints defs,
                                    mkClosedElab fc env
@@ -86,7 +89,7 @@ delayOnFailure fc rig env exp pred pri elab
                                         (do ust <- get UST
                                             let nos' = noSolve ust
                                             put UST ({ noSolve := nos } ust)
-                                            res <- elab True
+                                            res <- withFrames frames (elab True)
                                             ust <- get UST
                                             put UST ({ noSolve := nos' } ust)
                                             pure res))) :: ) }
@@ -121,12 +124,14 @@ delayElab {vars} fc rig env exp pri elab
          logGlueNF "elab.delay" 5 ("Postponing elaborator " ++ show nm ++
                       " for") env expected
          defs <- get Ctxt
+         -- run it later at the same stage (2LTT)
+         frames <- saveFrames
          update UST { delayedElab $=
                  ((pri, ci, localHints defs, mkClosedElab fc env
                                               (do ust <- get UST
                                                   let nos' = noSolve ust
                                                   put UST ({ noSolve := nos } ust)
-                                                  res <- elab
+                                                  res <- withFrames frames elab
                                                   ust <- get UST
                                                   put UST ({ noSolve := nos' } ust)
                                                   pure res)) :: ) }

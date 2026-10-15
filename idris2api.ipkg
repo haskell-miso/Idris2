@@ -291,6 +291,7 @@ modules =
     TTImp.TTImp.Traversals,
     TTImp.TTImp.TTC,
     TTImp.Unelab,
+    TTImp.Unstage,
     TTImp.Utils,
     TTImp.WithClause,
 

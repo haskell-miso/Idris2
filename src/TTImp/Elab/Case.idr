@@ -10,6 +10,7 @@ import Idris.REPL.Opts
 
 import TTImp.Elab.Check
 import TTImp.Elab.Delayed
+import TTImp.Elab.Stage
 import TTImp.Elab.ImplicitBind
 import TTImp.Elab.Utils
 import TTImp.ProcessFnOpt
@@ -253,7 +254,14 @@ caseBlock {vars} rigc elabinfo fc nest env opts scr scrtm scrty caseRig alts exp
          -- we come out again, so save them
          let olddelayed = delayedElab ust
          put UST ({ delayedElab := [] } ust)
+         -- Two-level type theory: the case block is at the current stage,
+         -- and captures variables which may be at either stage
+         registerNested (Resolved cidx) env
          processDecl [InCase] nest' Env.empty (IDef fc casen alts')
+         -- The case block is used here, so must be at this stage
+         defs <- get Ctxt
+         whenJust !(lookupCtxtExact (Resolved cidx) (gamma defs)) $
+              checkGlobalStage fc
 
          -- If there's no duplication of the scrutinee in the block,
          -- flag it as inlinable.

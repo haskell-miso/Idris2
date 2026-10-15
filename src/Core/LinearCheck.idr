@@ -359,7 +359,7 @@ mutual
       = do log "quantity" 15 "lcheck Quote"
            (ty', _, _) <- lcheck erased erase env ty
            (val', _, u) <- lcheck rig erase env val
-           pure (TQuote fc ty' val', gnf env (codeType fc ty), u)
+           pure (TQuote fc ty' val', gnf env !(mkCodeType fc ty), u)
   lcheck rig erase env (TSplice fc val)
       = do log "quantity" 15 "lcheck Splice"
            (val', gty, u) <- lcheck rig erase env val

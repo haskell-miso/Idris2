@@ -96,8 +96,8 @@ record StageState where
   usedSplice : Bool
   ||| Nested definitions (case blocks, local functions) created while
   ||| elaborating, with the stage they were created at and the stages of the
-  ||| variables they capture
-  nested : NameMap (Maybe Stage, NameMap Stage)
+  ||| variables they capture (by name, and in order, outermost first)
+  nested : NameMap (Maybe Stage, NameMap Stage, List (Maybe Stage))
 
 export
 initStageState : StageState

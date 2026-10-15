@@ -8,6 +8,7 @@ import Idris.REPL.Opts
 import Idris.Syntax
 
 import TTImp.Elab.Check
+import TTImp.Elab.Stage
 import TTImp.TTImp
 
 import Libraries.Data.NameMap
@@ -85,6 +86,9 @@ localHelper {vars} nest env nestdecls_in func
                let nestedName_in = Nested (outer, nextName ust) inner
                nestedName <- inCurrentNS nestedName_in
                n' <- addName nestedName
+               -- Two-level type theory: the local definition is at the
+               -- current stage, and captures variables at either stage
+               registerNested (Resolved n') env
                pure (inner, (Just nestedName, reverse (allVars env),
                         \fc, nt => applyToFull fc
                                (Ref fc nt (Resolved n')) env))

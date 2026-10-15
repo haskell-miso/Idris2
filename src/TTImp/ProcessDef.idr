@@ -23,12 +23,14 @@ import TTImp.Elab
 import TTImp.Elab.Binders
 import TTImp.Elab.Check
 import TTImp.Elab.Utils
+import TTImp.Elab.Stage
 import TTImp.Impossible
 import TTImp.PartialEval
 import TTImp.TTImp
 import TTImp.TTImp.Functor
 import TTImp.ProcessType
 import TTImp.Unelab
+import TTImp.Unstage
 import TTImp.WithClause
 
 import Data.Either
@@ -701,8 +703,9 @@ mkRunTime fc n
          Just gdef <- lookupCtxtExact n (gamma defs)
               | _ => pure ()
          let cov = gdef.totality.isCovering
-         -- If it's erased at run time, don't build the tree
-         when (not (isErased $ multiplicity gdef)) $ do
+         -- If it's erased at run time, don't build the tree. Likewise if it
+         -- only exists at compile time (2LTT meta level code)
+         when (not (isErased (multiplicity gdef) || isMetaStaged gdef)) $ do
            let PMDef r cargs tree_ct _ pats = definition gdef
                 | _ => pure () -- not a function definition
            let ty = type gdef
@@ -783,6 +786,8 @@ mkRunTime fc n
                Core (vars ** (Env Term vars, Term vars, Term vars))
     toErased fc spec (_ ** (env, lhs, rhs))
         = do lhs_erased <- linearCheck fc linear True env lhs
+             -- Two-level type theory: run the splices
+             rhs <- unstage env rhs
              -- Partially evaluate RHS here, where appropriate
              rhs' <- applyTransforms env rhs
              rhs' <- applySpecialise env spec rhs'
@@ -909,9 +914,27 @@ processDef opts nest env fc n_in cs_in
          -- and use this requirement when processing `with` blocks
          log "declare.def" 5 $ "Traversing clauses of " ++ show n ++ " with mult " ++ show mult
          let treq = fromMaybe !getDefaultTotalityOption (findSetTotal (flags gdef))
-         cs <- withTotality treq $
-               traverse (checkClause mult (collapseDefault $ visibility gdef) treq
-                                     hashit nidx opts nest env) cs_in
+         -- Two-level type theory: set up stage checking for this definition
+         oldst <- getStageState
+         let nestedInfo = lookup (Resolved nidx) (nested oldst)
+         let base0 = case defStage gdef of
+                          Just DMeta => Just SMeta
+                          _ => maybe Nothing fst nestedInfo
+         putStageState ({ active := True,
+                          base := base0,
+                          baseVars := maybe empty (fst . snd) nestedInfo,
+                          frames := [],
+                          usedSplice := False } oldst)
+         cs <- catch (withTotality treq $
+                        traverse (checkClause mult (collapseDefault $ visibility gdef) treq
+                                     hashit nidx opts nest env) cs_in)
+                     (\err => do st <- getStageState
+                                 putStageState ({ nested := nested st } oldst)
+                                 throw err)
+         st <- getStageState
+         putStageState ({ nested := nested st } oldst)
+         let stage = defStageOf st (maybe [] (snd . snd) nestedInfo)
+         log "declare.def.stage" 5 $ show n ++ " is at stage " ++ show stage
 
          let pats = map toPats (rights cs)
 
@@ -934,7 +957,8 @@ processDef opts nest env fc n_in cs_in
          -- but we'll rebuild that in a later pass once all the case
          -- blocks etc are resolved
          ignore $ addDef (Resolved nidx)
-                  ({ definition := PMDef pi cargs tree_ct tree_ct pats
+                  ({ definition := PMDef pi cargs tree_ct tree_ct pats,
+                     flags $= setStageFlag stage
                    } gdef)
 
          when (collapseDefault (visibility gdef) == Public) $
@@ -968,6 +992,28 @@ processDef opts nest env fc n_in cs_in
          when (not (elem InCase opts)) $
               compileRunTime fc atotal
   where
+    -- Two-level type theory: the stage of the definition we've just checked.
+    -- 'envStages' are the stages of the variables a nested definition
+    -- captures (outermost first)
+    defStageOf : StageState -> List (Maybe Stage) -> Maybe DefStage
+    defStageOf st envStages
+        = case base st of
+               Just SMeta => Just DMeta
+               Just SObj =>
+                   if any (== Just SMeta) envStages
+                      then Just (DMixed (map (fromMaybe SObj) envStages))
+                      else Just DObj
+               Nothing => if usedSplice st then Just DObj else Nothing
+
+    setStageFlag : Maybe DefStage -> List DefFlag -> List DefFlag
+    setStageFlag s fs
+        = let fs' = filter (not . isStagedFlag) fs in
+              maybe fs' (\s' => Staged s' :: fs') s
+      where
+        isStagedFlag : DefFlag -> Bool
+        isStagedFlag (Staged _) = True
+        isStagedFlag _ = False
+
     -- Move `withTotality` to Core.Context if we need it elsewhere
     ||| Temporarily rebind the default totality requirement (%default total/partial/covering).
     withTotality : TotalReq -> Lazy (Core a) -> Core a

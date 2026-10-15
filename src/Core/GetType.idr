@@ -59,7 +59,7 @@ mutual
                        pure $ glueBack defs env fty
                 _ => throw (GenericMsg fc "Not a delayed type")
   chk env (TQuote fc ty tm)
-      = pure $ gnf env (codeType fc ty)
+      = pure $ gnf env !(mkCodeType fc ty)
   chk env (TSplice fc tm)
       = do tm' <- chk env tm
            case !(getNF tm') of

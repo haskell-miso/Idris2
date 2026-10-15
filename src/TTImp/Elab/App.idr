@@ -38,6 +38,10 @@ onLHS : ElabMode -> Bool
 onLHS (InLHS _) = True
 onLHS _ = False
 
+isPrimType : NF vars -> Bool
+isPrimType (NPrimVal _ (PrT _)) = True
+isPrimType _ = False
+
 -- Get the type of a variable, assuming we haven't found it in the nested
 -- names. Look in the Env first, then the global context.
 getNameType : {vars : _} ->
@@ -53,7 +57,9 @@ getNameType elabMode rigc env fc x
     = case defined x env of
            Just (MkIsDefined {idx} rigb lv) =>
               do rigSafe rigb rigc
-                 checkLocalStage fc vars x idx
+                 checkLocalStage fc rigc vars x idx
+                     (do nfty <- getNF (gnf env (binderType (getBinder lv env)))
+                         pure (isPrimType nfty))
                  let binder = getBinder lv env
                  let bty = binderType binder
 
@@ -78,7 +84,7 @@ getNameType elabMode rigc env fc x
                  when (not $ onLHS elabMode) $
                    checkDeprecation fc def
                  rigSafe (multiplicity def) rigc
-                 checkGlobalStage fc def
+                 unless (isErased rigc) $ checkGlobalStage fc def
                  let nt = getDefNameType def
 
                  log "ide-mode.highlight" 8
@@ -132,7 +138,7 @@ getVarType elabMode rigc nest env fc x
                              tyenv = useVars (getArgs tm)
                                              (embed (type ndef)) in
                              do checkVisibleNS fc (fullname ndef) (collapseDefault $ visibility ndef)
-                                checkGlobalStage fc ndef
+                                unless (isErased rigc) $ checkGlobalStage fc ndef
                                 logTerm "elab" 5 ("Type of " ++ show n') tyenv
                                 logTerm "elab" 5 ("Expands to") tm
                                 log "elab" 5 $ "Arg length " ++ show arglen

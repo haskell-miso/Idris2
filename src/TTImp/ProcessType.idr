@@ -11,6 +11,7 @@ import Idris.Syntax
 
 import TTImp.Elab.Check
 import TTImp.Elab.Utils
+import TTImp.Elab.Stage
 import TTImp.Elab
 import TTImp.ProcessFnOpt
 import TTImp.TTImp
@@ -160,7 +161,7 @@ processType {vars} eopts nest env fc rig vis opts ty_raw
 
          u <- uniVar fc
          ty <-
-             wrapErrorC eopts (InType fc n) $
+             wrapErrorC eopts (InType fc n) $ noStageCheck $
                    checkTerm idx InType (HolesOkay :: eopts) nest env
                              (IBindHere fc (PI erased) ty_raw.val)
                              (gType fc u)
@@ -184,6 +185,10 @@ processType {vars} eopts nest env fc rig vis opts ty_raw
          -- But, if it's a case block, it'll be checked as part of the top
          -- level check so don't set the flag.
          unless (InCase `elem` eopts) $ setLinearCheck idx True
+
+         -- Two-level type theory: a definition whose type mentions 'Code'
+         -- only exists at compile time
+         when !(isMetaType env ty) $ setStage fc (Resolved idx) DMeta
 
          log "declare.type" 2 $ "Setting options for " ++ show n ++ ": " ++ show opts
          let name = Resolved idx

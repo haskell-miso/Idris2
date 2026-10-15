@@ -115,6 +115,7 @@ modules = Control.App,
           Deriving.Traversable,
 
           Language.Reflection,
+          Language.Staged,
           Language.Reflection.TT,
           Language.Reflection.TTImp,
 

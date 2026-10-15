@@ -47,25 +47,6 @@ currentStage
               ((_, s) :: _) => pure (Just s)
               [] => pure (base st)
 
-||| The stage flag of a global definition, if any
-export
-defStage : GlobalDef -> Maybe DefStage
-defStage def = findStage def.flags
-  where
-    findStage : List DefFlag -> Maybe DefStage
-    findStage [] = Nothing
-    findStage (Staged s :: _) = Just s
-    findStage (_ :: fs) = findStage fs
-
-||| Is this definition only used at compile time, i.e. never compiled?
-export
-isMetaStaged : GlobalDef -> Bool
-isMetaStaged def
-    = case defStage def of
-           Just DMeta => True
-           Just (DMixed _) => True
-           _ => False
-
 stageText : Stage -> String
 stageText SMeta = "the meta level (compile time)"
 stageText SObj = "the object level (run time)"
@@ -118,16 +99,45 @@ localStage vars n idx
     = do st <- getStageState
          pure (varStageAt n (minus (length vars) (S idx)) st)
 
-||| Check that a local variable is used at the stage it was bound at
+||| Check that a local variable is used at the stage it was bound at.
+||| Uses in erased positions (e.g. types in object code) are always fine,
+||| since staging computes them and they don't exist at run time.
+||| Meta level values of primitive types (Int, String, ...) can be used
+||| directly at the object level (cross stage persistence), since staging
+||| turns them into literals.
 export
 checkLocalStage : {auto u : Ref UST UState} ->
-                  FC -> (vars : Scope) -> Name -> (idx : Nat) -> Core ()
-checkLocalStage fc vars n idx
+                  FC -> RigCount -> (vars : Scope) -> Name -> (idx : Nat) ->
+                  (isPrimTy : Core Bool) -> Core ()
+checkLocalStage fc rig vars n idx isPrimTy
     = do st <- getStageState
-         when (active st) $
+         when (active st && not (isErased rig)) $
            do Just vs <- localStage vars n idx
                    | Nothing => pure () -- bound at the (unknown) base stage
-              requireStage fc ("The variable " ++ show n) vs
+              Just cur <- currentStage
+                   | Nothing => requireStage fc ("The variable " ++ show n) vs
+              when (vs /= cur) $
+                 do -- cross stage persistence for primitive values
+                    prim <- isPrimTy
+                    unless (vs == SMeta && cur == SObj && prim) $
+                       requireStage fc ("The variable " ++ show n) vs
+
+||| Record the stages for a nested definition (case block or local function)
+||| created here, which captures the variables in the environment
+export
+registerNested : {auto u : Ref UST UState} ->
+                 {vars : _} ->
+                 Name -> Env Term vars -> Core ()
+registerNested n env
+    = do st <- getStageState
+         when (active st) $
+           do body <- currentStage
+              let outer = reverse vars -- outermost first
+              let stages = zipWith (\p, x => varStageAt x p st)
+                                   [0 .. length outer] outer
+              let named = fromList (mapMaybe (\ (x, s) => map (x,) s)
+                                             (zip outer stages))
+              putStageState ({ nested $= insert n (body, named, stages) } st)
 
 ||| Check that a global name is used at a stage where it exists
 export
@@ -210,15 +220,16 @@ mentionsCode _ = False
 ||| Is this the type of a meta level definition? It is if it mentions 'Code',
 ||| perhaps after unfolding type synonyms.
 export
-isMetaType : {auto c : Ref Ctxt Defs} -> ClosedTerm -> Core Bool
-isMetaType ty
+isMetaType : {vars : _} ->
+             {auto c : Ref Ctxt Defs} -> Env Term vars -> Term vars -> Core Bool
+isMetaType env ty
     = if mentionsCode ty
          then pure True
          else do defs <- get Ctxt
                  -- Only bother normalising if 'Code' exists at all
                  Just _ <- lookupCtxtExact codeName (gamma defs)
                       | Nothing => pure False
-                 nty <- normalise defs Env.empty ty
+                 nty <- normalise defs env ty
                  pure (mentionsCode nty)
 
 ||| Add a stage flag to a definition

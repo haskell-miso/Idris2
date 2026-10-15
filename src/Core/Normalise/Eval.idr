@@ -159,9 +159,12 @@ parameters (defs : Defs) (topopts : EvalOpts)
     -- [|| ~e ||] = e
     eval env locs (TQuote fc ty (TSplice _ tm)) stk
         = eval env locs tm stk
+    -- The body of a quotation is object code: keep it as it is (in
+    -- particular, don't replace a variable by the closure it is bound to,
+    -- since that is meta level code)
     eval env locs (TQuote fc ty tm) stk
         = pure (NQuote fc (mkClosure topopts locs env ty)
-                          (mkClosure topopts locs env tm))
+                          (MkClosure topopts locs env tm))
     -- ~[|| e ||] = e
     eval env locs (TSplice fc tm) stk
         = do tm' <- eval env locs tm []

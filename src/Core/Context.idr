@@ -1600,6 +1600,34 @@ setIsEscapeHatch fc n
               | Nothing => undefinedName fc n
          ignore $ addDef n ({ isEscapeHatch := True } def)
 
+||| 'Code ty', with the name of 'Code' resolved (as names usually are in
+||| elaborated terms, so that unification can compare them)
+export
+mkCodeType : {auto c : Ref Ctxt Defs} -> FC -> Term vars -> Core (Term vars)
+mkCodeType fc ty
+    = do defs <- get Ctxt
+         let n = maybe codeName Resolved (getNameID codeName (gamma defs))
+         pure (App fc (Ref fc (TyCon 1) n) ty)
+
+||| The stage flag of a global definition, if any
+export
+defStage : GlobalDef -> Maybe DefStage
+defStage def = findStage def.flags
+  where
+    findStage : List DefFlag -> Maybe DefStage
+    findStage [] = Nothing
+    findStage (Staged s :: _) = Just s
+    findStage (_ :: fs) = findStage fs
+
+||| Is this definition only used at compile time, i.e. never compiled?
+export
+isMetaStaged : GlobalDef -> Bool
+isMetaStaged def
+    = case defStage def of
+           Just DMeta => True
+           Just (DMixed _) => True
+           _ => False
+
 export
 setFlag : {auto c : Ref Ctxt Defs} ->
         FC -> Name -> DefFlag -> Core ()

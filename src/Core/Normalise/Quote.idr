@@ -165,6 +165,7 @@ mutual
       = do ty' <- quoteGenNF q opts defs bounds env !(evalClosure defs ty)
            pure (PVTy fc r ty')
 
+  export
   quoteGenNF : {auto c : Ref Ctxt Defs} ->
                {bound, vars : _} ->
                Ref QVar Int -> QuoteOpts ->

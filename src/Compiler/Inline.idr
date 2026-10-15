@@ -598,4 +598,5 @@ compileAndInlineAll
         = do defs <- get Ctxt
              Just gdef <- lookupCtxtExact n (gamma defs)
                   | Nothing => pure False
-             pure (multiplicity gdef /= erased)
+             -- meta level code (2LTT) only exists at compile time
+             pure (multiplicity gdef /= erased && not (isMetaStaged gdef))
