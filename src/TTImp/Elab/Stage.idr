@@ -223,14 +223,14 @@ export
 isMetaType : {vars : _} ->
              {auto c : Ref Ctxt Defs} -> Env Term vars -> Term vars -> Core Bool
 isMetaType env ty
-    = if mentionsCode ty
-         then pure True
-         else do defs <- get Ctxt
-                 -- Only bother normalising if 'Code' exists at all
-                 Just _ <- lookupCtxtExact codeName (gamma defs)
-                      | Nothing => pure False
-                 nty <- normalise defs env ty
-                 pure (mentionsCode nty)
+    = do defs <- get Ctxt
+         -- Only if 'Code' exists at all
+         Just _ <- lookupCtxtExact codeName (gamma defs)
+              | Nothing => pure False
+         if mentionsCode !(toFullNames ty)
+            then pure True
+            else do nty <- normalise defs env ty
+                    pure (mentionsCode !(toFullNames nty))
 
 ||| Add a stage flag to a definition
 export

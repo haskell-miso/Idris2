@@ -122,6 +122,7 @@ knownTopics = [
     ("elab.record", Nothing),
     ("elab.retry", Nothing),
     ("elab.rewrite", Nothing),
+    ("elab.stage", Just "Two-level type theory: inserted quotations and splices"),
     ("elab.unify", Nothing),
     ("elab.update", Nothing),
     ("elab.with", Nothing),

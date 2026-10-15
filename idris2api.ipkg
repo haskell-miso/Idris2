@@ -308,6 +308,7 @@ modules =
     TTImp.Elab.Lazy,
     TTImp.Elab.Stage,
     TTImp.Elab.Staged,
+    TTImp.Elab.StageInfer,
     TTImp.Elab.Local,
     TTImp.Elab.Prim,
     TTImp.Elab.Quote,

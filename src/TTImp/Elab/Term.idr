@@ -27,6 +27,7 @@ import TTImp.Elab.Record
 import TTImp.Elab.Rewrite
 import TTImp.Elab.RunElab
 import TTImp.Elab.Staged
+import TTImp.Elab.StageInfer
 import TTImp.TTImp
 
 %default covering
@@ -302,7 +303,10 @@ TTImp.Elab.Check.check rigc elabinfo nest env tm_in exp
          case elabMode elabinfo of
               InLHS _ => -- Don't expand implicit lambda on lhs
                  checkImp rigc elabinfo nest env tm exp
-              _ => do tm' <- insertImpLam env tm exp
+              _ => do -- Two-level type theory: insert quotations and
+                      -- splices the types tell us we need
+                      tm <- insertStageCoercion nest env tm exp
+                      tm' <- insertImpLam env tm exp
                       checkImp rigc elabinfo nest env tm' exp
 
 onLHS : ElabMode -> Bool
