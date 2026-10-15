@@ -65,6 +65,8 @@ substLoc i tm (As fc s f a) = As fc s (substLoc i tm f) (substLoc i tm a)
 substLoc i tm (TDelayed fc r d) = TDelayed fc r (substLoc i tm d)
 substLoc i tm (TDelay fc r ty d) = TDelay fc r (substLoc i tm ty) (substLoc i tm d)
 substLoc i tm (TForce fc r d) = TForce fc r (substLoc i tm d)
+substLoc i tm (TQuote fc ty d) = TQuote fc (substLoc i tm ty) (substLoc i tm d)
+substLoc i tm (TSplice fc d) = TSplice fc (substLoc i tm d)
 substLoc i tm x = x
 
 substLocs : {vs : _} ->
@@ -466,6 +468,13 @@ findSpecs env stk (TDelay fc r ty tm)
 findSpecs env stk (TForce fc r tm)
     = do tm' <- findSpecs env [] tm
          pure $ applyStackWithFC (TForce fc r tm') stk
+findSpecs env stk (TQuote fc ty tm)
+    = do ty' <- findSpecs env [] ty
+         tm' <- findSpecs env [] tm
+         pure $ applyStackWithFC (TQuote fc ty' tm') stk
+findSpecs env stk (TSplice fc tm)
+    = do tm' <- findSpecs env [] tm
+         pure $ applyStackWithFC (TSplice fc tm') stk
 findSpecs env stk tm = pure $ applyStackWithFC tm stk
 
 bName : {auto q : Ref QVar Int} -> String -> Core Name
@@ -673,6 +682,20 @@ mutual
                       pure $ applyStackWithFC !(quoteGenNF q defs bound env argNF) args'
                 _ => do arg' <- quoteGenNF q defs bound env arg
                         pure $ applyStackWithFC (TForce fc r arg') args'
+  quoteGenNF q defs bound env (NQuote fc ty arg)
+      = do argNF <- evalClosure defs arg
+           argQ <- quoteGenNF q defs bound env argNF
+           tyNF <- evalClosure defs ty
+           tyQ <- quoteGenNF q defs bound env tyNF
+           pure (TQuote fc tyQ argQ)
+  quoteGenNF q defs bound env (NSplice fc arg args)
+      = do args' <- quoteArgsWithFC q defs bound env args
+           case arg of
+                NQuote fc _ arg =>
+                   do argNF <- evalClosure defs arg
+                      pure $ applyStackWithFC !(quoteGenNF q defs bound env argNF) args'
+                _ => do arg' <- quoteGenNF q defs bound env arg
+                        pure $ applyStackWithFC (TSplice fc arg') args'
   quoteGenNF q defs bound env (NPrimVal fc c) = pure $ PrimVal fc c
   quoteGenNF q defs bound env (NErased fc Impossible) = pure $ Erased fc Impossible
   quoteGenNF q defs bound env (NErased fc Placeholder) = pure $ Erased fc Placeholder

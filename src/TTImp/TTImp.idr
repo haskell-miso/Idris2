@@ -117,6 +117,10 @@ mutual
        IUnquote : FC -> RawImp' nm -> RawImp' nm
        IRunElab : FC -> (requireExtension : Bool) -> RawImp' nm -> RawImp' nm
 
+       -- Two-level type theory: a quotation of object level code
+       -- (splices are 'IUnquote' outside a reflection quote)
+       IStageQuote : FC -> RawImp' nm -> RawImp' nm
+
        IPrimVal : FC -> (c : Constant) -> RawImp' nm
        IType : FC -> RawImp' nm
        IHole : FC -> String -> RawImp' nm
@@ -204,6 +208,7 @@ mutual
       show (IQuoteDecl fc tm) = "(%quotedecl " ++ show tm ++ ")"
       show (IUnquote fc tm) = "(%unquote " ++ show tm ++ ")"
       show (IRunElab fc _ tm) = "(%runelab " ++ show tm ++ ")"
+      show (IStageQuote fc tm) = "[|| " ++ show tm ++ " ||]"
       show (IPrimVal fc c) = show c
       show (IHole _ x) = "?" ++ x
       show (IUnifyLog _ lvl x) = "(%logging " ++ show lvl ++ " " ++ show x ++ ")"
@@ -624,6 +629,7 @@ findIBinds (IForce fc tm) = findIBinds tm
 findIBinds (IQuote fc tm) = findIBinds tm
 findIBinds (IUnquote fc tm) = findIBinds tm
 findIBinds (IRunElab fc _ tm) = findIBinds tm
+findIBinds (IStageQuote fc tm) = findIBinds tm
 findIBinds (IBindHere _ _ tm) = findIBinds tm
 findIBinds (IBindVar _ (UN (Basic n))) = [n]
 findIBinds (IUpdate fc updates tm)
@@ -660,6 +666,7 @@ findImplicits (IForce fc tm) = findImplicits tm
 findImplicits (IQuote fc tm) = findImplicits tm
 findImplicits (IUnquote fc tm) = findImplicits tm
 findImplicits (IRunElab fc _ tm) = findImplicits tm
+findImplicits (IStageQuote fc tm) = findImplicits tm
 findImplicits (IBindVar _ (UN (Basic n))) = [n]
 findImplicits (IUpdate fc updates tm)
     = findImplicits tm ++ concatMap (findImplicits . getFieldUpdateTerm) updates
@@ -894,6 +901,7 @@ getFC (IQuoteName x _) = x
 getFC (IQuoteDecl x _) = x
 getFC (IUnquote x _) = x
 getFC (IRunElab x _ _) = x
+getFC (IStageQuote x _) = x
 getFC (IAs x _ _ _ _) = x
 getFC (Implicit x _) = x
 getFC (IWithUnambigNames x _ _) = x

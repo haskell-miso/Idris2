@@ -297,6 +297,14 @@ replace' {vars} tmpi defs env lhs parg tm
         = do args' <- traverse (traversePair repArg) args
              tm' <- repSub tm
              pure $ applyStackWithFC (TForce fc r tm') args'
+    repSub (NQuote fc ty tm)
+        = do ty' <- replace' tmpi defs env lhs parg !(evalClosure defs ty)
+             tm' <- replace' tmpi defs env lhs parg !(evalClosure defs tm)
+             pure (TQuote fc ty' tm')
+    repSub (NSplice fc tm args)
+        = do args' <- traverse (traversePair repArg) args
+             tm' <- repSub tm
+             pure $ applyStackWithFC (TSplice fc tm') args'
     repSub (NErased fc (Dotted t))
         = do t' <- repSub t
              pure (Erased fc (Dotted t'))

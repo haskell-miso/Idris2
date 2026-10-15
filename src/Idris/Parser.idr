@@ -590,6 +590,12 @@ mutual
            (x, expr) <- pure b.val
            pure (PAs (boundToFC fname b) (boundToFC fname x) x.val expr)
     <|> do b <- bounds $ do
+                  decoratedSymbol fname "[||"
+                  t <- typeExpr pdef fname indents
+                  decoratedSymbol fname "||]"
+                  pure t
+           pure (PStageQuote (boundToFC fname b) b.val)
+    <|> do b <- bounds $ do
                   mns <- decoratedNamespacedSymbol fname "[|"
                   t   <- expr pdef fname indents
                   decoratedSymbol fname "|]"

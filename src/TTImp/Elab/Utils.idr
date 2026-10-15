@@ -218,6 +218,8 @@ termInlineSafe (As fc x as pat) = termInlineSafe pat
 termInlineSafe (TDelayed fc x ty) = termInlineSafe ty
 termInlineSafe (TDelay fc x ty arg) = termInlineSafe arg
 termInlineSafe (TForce fc x val) = termInlineSafe val
+termInlineSafe (TQuote fc ty arg) = termInlineSafe arg
+termInlineSafe (TSplice fc val) = termInlineSafe val
 termInlineSafe _ = pure True
 
 termsInlineSafe [] = pure True

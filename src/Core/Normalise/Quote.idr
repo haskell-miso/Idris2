@@ -226,6 +226,29 @@ mutual
                       pure $ applyStackWithFC !(quoteGenNF q opts defs bound env argNF) args'
                 _ => do arg' <- quoteGenNF q opts defs bound env arg
                         pure $ applyStackWithFC (TForce fc r arg') args'
+  -- Quotations are read back without unfolding definitions, so that object
+  -- code keeps its shape
+  quoteGenNF q opts defs bound env (NQuote fc ty arg)
+      = do argNF <- evalClosure defs (toHolesOnly arg)
+           argQ <- quoteGenNF q opts defs bound env argNF
+           tyNF <- evalClosure defs (toHolesOnly ty)
+           tyQ <- quoteGenNF q opts defs bound env tyNF
+           pure (TQuote fc tyQ argQ)
+    where
+      toHolesOnly : Closure vs -> Closure vs
+      toHolesOnly (MkClosure opts locs env tm)
+          = MkClosure ({ holesOnly := True,
+                         argHolesOnly := True } opts)
+                      locs env tm
+      toHolesOnly c = c
+  quoteGenNF q opts defs bound env (NSplice fc arg args)
+      = do args' <- quoteArgsWithFC q opts defs bound env args
+           case arg of
+                NQuote fc _ arg =>
+                   do argNF <- evalClosure defs arg
+                      pure $ applyStackWithFC !(quoteGenNF q opts defs bound env argNF) args'
+                _ => do arg' <- quoteGenNF q opts defs bound env arg
+                        pure $ applyStackWithFC (TSplice fc arg') args'
   quoteGenNF q opts defs bound env (NPrimVal fc c) = pure $ PrimVal fc c
   quoteGenNF q opts defs bound env (NErased fc t)
     = Erased fc <$> traverse @{%search} @{CORE} (\ nf => quoteGenNF q opts defs bound env nf) t

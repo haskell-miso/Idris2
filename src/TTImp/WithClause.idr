@@ -267,6 +267,8 @@ withRHS fc drop wname wargnames tm toplhs
       wrhs (IDelayed fc r tm) = pure $ IDelayed fc r !(wrhs tm)
       wrhs (IDelay fc tm) = pure $ IDelay fc !(wrhs tm)
       wrhs (IForce fc tm) = pure $ IForce fc !(wrhs tm)
+      wrhs (IStageQuote fc tm) = pure $ IStageQuote fc !(wrhs tm)
+      wrhs (IUnquote fc tm) = pure $ IUnquote fc !(wrhs tm)
       wrhs tm = pure tm
 
       wrhsC : ImpClause -> Core ImpClause

@@ -26,6 +26,7 @@ import TTImp.Elab.Quote
 import TTImp.Elab.Record
 import TTImp.Elab.Rewrite
 import TTImp.Elab.RunElab
+import TTImp.Elab.Staged
 import TTImp.TTImp
 
 %default covering
@@ -199,8 +200,11 @@ checkTerm rig elabinfo nest env (IQuoteName fc n) exp
     = checkQuoteName rig elabinfo nest env fc n exp
 checkTerm rig elabinfo nest env (IQuoteDecl fc ds) exp
     = checkQuoteDecl rig elabinfo nest env fc ds exp
+-- Outside a reflection quote, ~e is a splice of staged code
 checkTerm rig elabinfo nest env (IUnquote fc tm) exp
-    = throw (GenericMsg fc "Can't escape outside a quoted term")
+    = checkStageSplice rig elabinfo nest env fc tm exp
+checkTerm rig elabinfo nest env (IStageQuote fc tm) exp
+    = checkStageQuote rig elabinfo nest env fc tm exp
 checkTerm rig elabinfo nest env (IRunElab fc re tm) exp
     = checkRunElab rig elabinfo nest env fc re tm exp
 checkTerm {vars} rig elabinfo nest env (IPrimVal fc c) exp

@@ -67,6 +67,8 @@ mutual
       = pure $ IForce fc !(getUnquote t)
   getUnquote (IQuote fc t)
       = pure $ IQuote fc !(getUnquote t)
+  getUnquote (IStageQuote fc t)
+      = pure $ IStageQuote fc !(getUnquote t)
   getUnquote (IUnquote fc tm)
       = do qv <- genVarName "q"
            update Unq ((qv, fc, tm) ::)

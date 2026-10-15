@@ -447,6 +447,10 @@ mkLocals outer bs (TDelay fc x t y)
     = TDelay fc x (mkLocals outer bs t) (mkLocals outer bs y)
 mkLocals outer bs (TForce fc r x)
     = TForce fc r (mkLocals outer bs x)
+mkLocals outer bs (TQuote fc t y)
+    = TQuote fc (mkLocals outer bs t) (mkLocals outer bs y)
+mkLocals outer bs (TSplice fc x)
+    = TSplice fc (mkLocals outer bs x)
 mkLocals outer bs (PrimVal fc c) = PrimVal fc c
 mkLocals outer bs (Erased fc Impossible) = Erased fc Impossible
 mkLocals outer bs (Erased fc Placeholder) = Erased fc Placeholder
@@ -486,6 +490,10 @@ substName x new (TDelay fc y t z)
     = TDelay fc y (substName x new t) (substName x new z)
 substName x new (TForce fc r y)
     = TForce fc r (substName x new y)
+substName x new (TQuote fc t z)
+    = TQuote fc (substName x new t) (substName x new z)
+substName x new (TSplice fc y)
+    = TSplice fc (substName x new y)
 substName x new tm = tm
 
 export
@@ -509,6 +517,9 @@ addMetas res ns (TDelayed fc x y) = addMetas res ns y
 addMetas res ns (TDelay fc x t y)
     = addMetas res (addMetas res ns t) y
 addMetas res ns (TForce fc r x) = addMetas res ns x
+addMetas res ns (TQuote fc t y)
+    = addMetas res (addMetas res ns t) y
+addMetas res ns (TSplice fc x) = addMetas res ns x
 addMetas res ns (PrimVal fc c) = ns
 addMetas res ns (Erased fc i) = foldr (flip $ addMetas res) ns i
 addMetas res ns (TType fc u) = ns
@@ -544,6 +555,9 @@ addRefs ua at ns (TDelayed fc x y) = addRefs ua at ns y
 addRefs ua at ns (TDelay fc x t y)
     = addRefs ua at (addRefs ua at ns t) y
 addRefs ua at ns (TForce fc r x) = addRefs ua at ns x
+addRefs ua at ns (TQuote fc t y)
+    = addRefs ua at (addRefs ua at ns t) y
+addRefs ua at ns (TSplice fc x) = addRefs ua at ns x
 addRefs ua at ns (PrimVal fc c) = ns
 addRefs ua at ns (Erased fc i) = foldr (flip $ addRefs ua at) ns i
 addRefs ua at ns (TType fc u) = ns

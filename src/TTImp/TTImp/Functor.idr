@@ -65,6 +65,8 @@ mutual
       = IUnquote fc (map f t)
     map f (IRunElab fc re t)
       = IRunElab fc re (map f t)
+    map f (IStageQuote fc t)
+      = IStageQuote fc (map f t)
     map f (IPrimVal fc c)
       = IPrimVal fc c
     map f (IType fc)

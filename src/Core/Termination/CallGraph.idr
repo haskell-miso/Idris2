@@ -37,6 +37,8 @@ sizeEq p (As _ _ a p') = sizeEq p a || sizeEq p p'
 sizeEq (TDelayed _ _ t) (TDelayed _ _ t') = sizeEq t t'
 sizeEq (TDelay _ _ t x) (TDelay _ _ t' x') = sizeEq t t' && sizeEq x x'
 sizeEq (TForce _ _ t) (TForce _ _ t') = sizeEq t t'
+sizeEq (TQuote _ t x) (TQuote _ t' x') = sizeEq t t' && sizeEq x x'
+sizeEq (TSplice _ t) (TSplice _ t') = sizeEq t t'
 sizeEq (PrimVal _ c) (PrimVal _ c') = c == c'
 -- traverse dotted LHS terms
 sizeEq t (Erased _ (Dotted t')) = eqTerm t t' -- t' is no longer a pattern
@@ -66,6 +68,8 @@ delazy defs (Bind fc x b sc)
     = Bind fc x (map (delazy defs) b) (delazy defs sc)
 delazy defs (App fc f a) = App fc (delazy defs f) (delazy defs a)
 delazy defs (As fc s a p) = As fc s (delazy defs a) (delazy defs p)
+delazy defs (TQuote fc ty tm) = TQuote fc (delazy defs ty) (delazy defs tm)
+delazy defs (TSplice fc tm) = TSplice fc (delazy defs tm)
 delazy defs tm = tm
 
 mutual
@@ -89,6 +93,10 @@ mutual
   findSC defs env g pats (TDelay _ _ _ tm)
       = findSC defs env g pats tm
   findSC defs env g pats (TForce _ _ tm)
+      = findSC defs env Unguarded pats tm
+  findSC defs env g pats (TQuote _ _ tm)
+      = findSC defs env Unguarded pats tm
+  findSC defs env g pats (TSplice _ tm)
       = findSC defs env Unguarded pats tm
   findSC defs env g pats tm
       = do let (fn, args) = getFnArgs tm
@@ -325,6 +333,9 @@ mutual
           urhs (TDelay fc r ty tm)
               = TDelay fc r (updateRHS ms ty) (updateRHS ms tm)
           urhs (TForce fc r tm) = TForce fc r (updateRHS ms tm)
+          urhs (TQuote fc ty tm)
+              = TQuote fc (updateRHS ms ty) (updateRHS ms tm)
+          urhs (TSplice fc tm) = TSplice fc (updateRHS ms tm)
           urhs (Bind fc x b sc)
               = Bind fc x (map (updateRHS ms) b)
                   (updateRHS (map (\vt => (weaken (fst vt), weaken (snd vt))) ms) sc)

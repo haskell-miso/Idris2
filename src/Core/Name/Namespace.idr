@@ -257,6 +257,11 @@ export
 preludeNS : Namespace
 preludeNS = mkNamespace "Prelude"
 
+||| Two-level type theory: the module defining 'Code'
+export
+stagedNS : Namespace
+stagedNS = mkNamespace "Language.Staged"
+
 export
 numNS : Namespace
 numNS = mkNamespace "Prelude.Num"

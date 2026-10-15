@@ -58,6 +58,17 @@ mutual
                     do defs <- get Ctxt
                        pure $ glueBack defs env fty
                 _ => throw (GenericMsg fc "Not a delayed type")
+  chk env (TQuote fc ty tm)
+      = pure $ gnf env (codeType fc ty)
+  chk env (TSplice fc tm)
+      = do tm' <- chk env tm
+           case !(getNF tm') of
+                NTCon _ n _ [(_, aty)] =>
+                    if !(getFullName n) == codeName
+                       then do defs <- get Ctxt
+                               pure $ glueBack defs env !(evalClosure defs aty)
+                       else throw (GenericMsg fc "Not a code type")
+                _ => throw (GenericMsg fc "Not a code type")
   chk env (PrimVal fc x) = pure $ gnf env (chkConstant fc x)
   chk env (TType fc u) = pure (gType fc (MN "top" 0))
   chk env (Erased fc _) = pure (gErased fc)

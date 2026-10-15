@@ -29,6 +29,8 @@ used idx (As _ _ _ pat) = used idx pat
 used idx (TDelayed _ _ tm) = used idx tm
 used idx (TDelay _ _ _ tm) = used idx tm
 used idx (TForce _ _ tm) = used idx tm
+used idx (TQuote _ _ tm) = used idx tm
+used idx (TSplice _ tm) = used idx tm
 used idx _ = False
 
 public export
@@ -110,6 +112,10 @@ mutual
           = TDelay fc y (substVars xs t) (substVars xs z)
       substVars xs (TForce fc r y)
           = TForce fc r (substVars xs y)
+      substVars xs (TQuote fc t z)
+          = TQuote fc (substVars xs t) (substVars xs z)
+      substVars xs (TSplice fc y)
+          = TSplice fc (substVars xs y)
       substVars xs tm = tm
 
       substArgs : SizeOf vs -> List (VarSet vs, Term vars) -> Term vs -> Term (vs ++ vars)
@@ -304,6 +310,12 @@ mutual
       = do (tm', ty) <- unelabTy' umode nest env tm
            defs <- get Ctxt
            pure (IForce fc tm', gErased fc)
+  unelabTy' umode nest env (TQuote fc _ tm)
+      = do (tm', ty) <- unelabTy' umode nest env tm
+           pure (IStageQuote fc tm', gErased fc)
+  unelabTy' umode nest env (TSplice fc tm)
+      = do (tm', ty) <- unelabTy' umode nest env tm
+           pure (IUnquote fc tm', gErased fc)
   unelabTy' umode nest env (PrimVal fc c) = pure (IPrimVal fc c, gErased fc)
   unelabTy' umode nest env (Erased fc (Dotted t))
     = unelabTy' umode nest env t

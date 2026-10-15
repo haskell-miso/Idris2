@@ -278,6 +278,10 @@ compileStk svs stk (TForce fc x tm)
          pure $ Apply (Var "ct-doForce")
                       [tm',
                       Vector (-5) [toScheme x, toScheme fc, Lambda [] tm']]
+compileStk svs stk (TQuote fc ty arg)
+    = throw (GenericMsg fc "Staged code (quotations) is not supported by the scheme evaluator")
+compileStk svs stk (TSplice fc tm)
+    = throw (GenericMsg fc "Staged code (splices) is not supported by the scheme evaluator")
 compileStk svs stk (PrimVal fc c) = pure $ compileConstant fc c
 compileStk svs stk (Erased fc why)
   = do why' <- compileWhyErased svs stk why

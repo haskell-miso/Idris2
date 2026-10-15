@@ -10,6 +10,7 @@ import Idris.Syntax
 
 import TTImp.Elab.Check
 import TTImp.Elab.Dot
+import TTImp.Elab.Stage
 import TTImp.TTImp
 
 import Data.List
@@ -42,6 +43,7 @@ onLHS _ = False
 getNameType : {vars : _} ->
               {auto c : Ref Ctxt Defs} ->
               {auto m : Ref MD Metadata} ->
+              {auto u : Ref UST UState} ->
               {auto e : Ref EST (EState vars)} ->
               ElabMode ->
               RigCount -> Env Term vars ->
@@ -49,8 +51,9 @@ getNameType : {vars : _} ->
               Core (Term vars, Glued vars)
 getNameType elabMode rigc env fc x
     = case defined x env of
-           Just (MkIsDefined rigb lv) =>
+           Just (MkIsDefined {idx} rigb lv) =>
               do rigSafe rigb rigc
+                 checkLocalStage fc vars x idx
                  let binder = getBinder lv env
                  let bty = binderType binder
 
@@ -75,6 +78,7 @@ getNameType elabMode rigc env fc x
                  when (not $ onLHS elabMode) $
                    checkDeprecation fc def
                  rigSafe (multiplicity def) rigc
+                 checkGlobalStage fc def
                  let nt = getDefNameType def
 
                  log "ide-mode.highlight" 8
@@ -106,6 +110,7 @@ getNameType elabMode rigc env fc x
 getVarType : {vars : _} ->
              {auto c : Ref Ctxt Defs} ->
              {auto m : Ref MD Metadata} ->
+             {auto u : Ref UST UState} ->
              {auto e : Ref EST (EState vars)} ->
              ElabMode ->
              RigCount -> NestedNames vars -> Env Term vars ->
@@ -127,6 +132,7 @@ getVarType elabMode rigc nest env fc x
                              tyenv = useVars (getArgs tm)
                                              (embed (type ndef)) in
                              do checkVisibleNS fc (fullname ndef) (collapseDefault $ visibility ndef)
+                                checkGlobalStage fc ndef
                                 logTerm "elab" 5 ("Type of " ++ show n') tyenv
                                 logTerm "elab" 5 ("Expands to") tm
                                 log "elab" 5 $ "Arg length " ++ show arglen

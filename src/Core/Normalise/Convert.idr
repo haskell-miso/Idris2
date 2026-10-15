@@ -77,6 +77,8 @@ tryUpdate ms (As fc s a p) = pure $ As fc s !(tryUpdate ms a) !(tryUpdate ms p)
 tryUpdate ms (TDelayed fc r tm) = pure $ TDelayed fc r !(tryUpdate ms tm)
 tryUpdate ms (TDelay fc r ty tm) = pure $ TDelay fc r !(tryUpdate ms ty) !(tryUpdate ms tm)
 tryUpdate ms (TForce fc r tm) = pure $ TForce fc r !(tryUpdate ms tm)
+tryUpdate ms (TQuote fc ty tm) = pure $ TQuote fc !(tryUpdate ms ty) !(tryUpdate ms tm)
+tryUpdate ms (TSplice fc tm) = pure $ TSplice fc !(tryUpdate ms tm)
 tryUpdate ms (PrimVal fc c) = pure $ PrimVal fc c
 tryUpdate ms (Erased fc a) = Erased fc <$> traverse (tryUpdate ms) a
 tryUpdate ms (TType fc u) = pure $ TType fc u
@@ -116,6 +118,9 @@ mutual
       quickConvArg (NDelayed _ _ t) (NDelayed _ _ t') = quickConvArg t t'
       quickConvArg (NDelay {}) (NDelay {}) = True
       quickConvArg (NForce _ _ t _) (NForce _ _ t' _) = quickConvArg t t'
+      quickConvArg (NQuote {}) _ = True -- eta for quotations
+      quickConvArg _ (NQuote {}) = True
+      quickConvArg (NSplice _ t _) (NSplice _ t' _) = quickConvArg t t'
       quickConvArg (NPrimVal _ c) (NPrimVal _ c') = c == c'
       quickConvArg (NType {}) (NType {}) = True
       quickConvArg (NErased {}) _ = True
@@ -416,6 +421,13 @@ mutual
                      else pure False
              else pure False
 
+    convGen q i defs env (NQuote _ _ arg) (NQuote _ _ arg')
+        = convGen q i defs env arg arg'
+    convGen q i defs env (NSplice _ arg args) (NSplice _ arg' args')
+        = if !(convGen q i defs env arg arg')
+             then allConv q i defs env (map snd args) (map snd args')
+             else pure False
+
     convGen q i defs env (NPrimVal _ c) (NPrimVal _ c') = pure (c == c')
     convGen q i defs env (NErased _ (Dotted t)) u = convGen q i defs env t u
     convGen q i defs env t (NErased _ (Dotted u)) = convGen q i defs env t u
@@ -424,6 +436,17 @@ mutual
     convGen q i defs env (NType _ ul) (NType _ ur)
         = -- TODO Cumulativity: Add constraint here
           pure True
+    -- eta for quotations: [|| ~x ||] = x
+    convGen q i defs env (NQuote _ _ arg) y
+        = do argNF <- evalClosure defs arg
+             case argNF of
+                  NSplice _ x [] => convGen q i defs env x y
+                  _ => pure False
+    convGen q i defs env x (NQuote _ _ arg)
+        = do argNF <- evalClosure defs arg
+             case argNF of
+                  NSplice _ y [] => convGen q i defs env x y
+                  _ => pure False
     convGen q i defs env x y = pure False
 
   export

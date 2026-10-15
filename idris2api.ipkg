@@ -305,6 +305,8 @@ modules =
     TTImp.Elab.Hole,
     TTImp.Elab.ImplicitBind,
     TTImp.Elab.Lazy,
+    TTImp.Elab.Stage,
+    TTImp.Elab.Staged,
     TTImp.Elab.Local,
     TTImp.Elab.Prim,
     TTImp.Elab.Quote,

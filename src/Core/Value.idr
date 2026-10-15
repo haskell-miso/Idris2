@@ -134,6 +134,10 @@ mutual
        NDelayed : FC -> LazyReason -> NF vars -> NF vars
        NDelay   : FC -> LazyReason -> Closure vars -> Closure vars -> NF vars
        NForce   : FC -> LazyReason -> NF vars -> List (FC, Closure vars) -> NF vars
+       -- Two-level type theory: a quotation (object type, object code)
+       NQuote   : FC -> Closure vars -> Closure vars -> NF vars
+       -- A stuck splice, applied to some arguments
+       NSplice  : FC -> NF vars -> List (FC, Closure vars) -> NF vars
        NPrimVal : FC -> Constant -> NF vars
        NErased  : FC -> WhyErased (NF vars) -> NF vars
        NType    : FC -> Name -> NF vars
@@ -176,6 +180,8 @@ getLoc (NAs fc _ _ _) = fc
 getLoc (NDelayed fc _ _) = fc
 getLoc (NDelay fc _ _ _) = fc
 getLoc (NForce fc _ _ _) = fc
+getLoc (NQuote fc _ _) = fc
+getLoc (NSplice fc _ _) = fc
 getLoc (NPrimVal fc _) = fc
 getLoc (NErased fc i) = fc
 getLoc (NType fc _) = fc
@@ -207,6 +213,8 @@ HasNames (NF free) where
   full defs (NDelayed fc lz nf) = pure $ NDelayed fc lz !(full defs nf)
   full defs (NDelay fc lz cl cl1) = pure $ NDelay fc lz cl cl1
   full defs (NForce fc lz nf xs) = pure $ NForce fc lz !(full defs nf) xs
+  full defs (NQuote fc cl cl1) = pure $ NQuote fc cl cl1
+  full defs (NSplice fc nf xs) = pure $ NSplice fc !(full defs nf) xs
   full defs (NPrimVal fc cst) = pure $ NPrimVal fc cst
   full defs (NErased fc imp) = pure $ NErased fc imp
   full defs (NType fc n) = pure $ NType fc !(full defs n)
@@ -219,6 +227,8 @@ HasNames (NF free) where
   resolved defs (NDelayed fc lz nf) = pure $ NDelayed fc lz !(resolved defs nf)
   resolved defs (NDelay fc lz cl cl1) = pure $ NDelay fc lz cl cl1
   resolved defs (NForce fc lz nf xs) = pure $ NForce fc lz !(resolved defs nf) xs
+  resolved defs (NQuote fc cl cl1) = pure $ NQuote fc cl cl1
+  resolved defs (NSplice fc nf xs) = pure $ NSplice fc !(resolved defs nf) xs
   resolved defs (NPrimVal fc cst) = pure $ NPrimVal fc cst
   resolved defs (NErased fc imp) = pure $ NErased fc imp
   resolved defs (NType fc n) = pure $ NType fc !(resolved defs n)
@@ -251,6 +261,8 @@ covering
   show (NDelayed _ _ tm) = "%Delayed " ++ show tm
   show (NDelay {}) = "%Delay [closure]"
   show (NForce _ _ tm args) = "%Force " ++ show tm ++ " [" ++ show (length args) ++ " closures]"
+  show (NQuote {}) = "[|| [closure] ||]"
+  show (NSplice _ tm args) = "~(" ++ show tm ++ ") [" ++ show (length args) ++ " closures]"
   show (NPrimVal _ c) = show c
   show (NErased {}) = "[__]"
   show (NType {}) = "Type"

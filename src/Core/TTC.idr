@@ -334,7 +334,8 @@ mutual
   export
   {vars : _} -> TTC (Term vars) where
     toBuf (Local {name} fc c idx y)
-        = if idx < 243
+        -- Tags 13..253 are for small locals; 254 and 255 are quote and splice
+        = if idx < 241
              then do tag (13 + cast idx)
                      toBuf c
              else do tag 0
@@ -378,6 +379,10 @@ mutual
         = tag 10
     toBuf (TType fc u)
         = do tag 11; toBuf u
+    toBuf (TQuote fc ty tm)
+        = do tag 254; toBuf ty; toBuf tm
+    toBuf (TSplice fc tm)
+        = do tag 255; toBuf tm
 
     fromBuf {vars}
         = case !getTag of
@@ -413,6 +418,10 @@ mutual
                12 => do fn <- fromBuf
                         args <- fromBuf
                         pure (apply emptyFC fn args)
+               254 => do ty <- fromBuf; tm <- fromBuf
+                         pure (TQuote emptyFC ty tm)
+               255 => do tm <- fromBuf
+                         pure (TSplice emptyFC tm)
                idxp => do c <- fromBuf
                           let idx : Nat = fromInteger (cast (idxp - 13))
                           let Just name = getAt idx vars
@@ -1069,6 +1078,28 @@ TTC TotalReq where
              2 => pure PartialOK
              _ => corrupt "TotalReq"
 
+TTC Stage where
+  toBuf SMeta = tag 0
+  toBuf SObj = tag 1
+
+  fromBuf
+      = case !getTag of
+             0 => pure SMeta
+             1 => pure SObj
+             _ => corrupt "Stage"
+
+TTC DefStage where
+  toBuf DMeta = tag 0
+  toBuf DObj = tag 1
+  toBuf (DMixed ss) = do tag 2; toBuf ss
+
+  fromBuf
+      = case !getTag of
+             0 => pure DMeta
+             1 => pure DObj
+             2 => do ss <- fromBuf; pure (DMixed ss)
+             _ => corrupt "DefStage"
+
 TTC DefFlag where
   toBuf Inline = tag 2
   toBuf NoInline = tag 13
@@ -1083,6 +1114,7 @@ TTC DefFlag where
   toBuf AllGuarded = tag 10
   toBuf (ConType ci) = do tag 11; toBuf ci
   toBuf (Identity x) = do tag 12; toBuf x
+  toBuf (Staged s) = do tag 0; toBuf s
 
   fromBuf
       = case !getTag of
@@ -1099,6 +1131,7 @@ TTC DefFlag where
              12 => do x <- fromBuf; pure (Identity x)
              13 => pure NoInline
              15 => pure Deprecate
+             0 => do s <- fromBuf; pure (Staged s)
              _ => corrupt "DefFlag"
 
 export

@@ -116,6 +116,9 @@ mutual
        PQuoteDecl : FC -> List (PDecl' nm) -> PTerm' nm
        PUnquote : FC -> PTerm' nm -> PTerm' nm
        PRunElab : FC -> PTerm' nm -> PTerm' nm
+       -- Two-level type theory: quotation of object code [|| e ||]
+       -- (splices are written ~e, and parsed as PUnquote)
+       PStageQuote : FC -> PTerm' nm -> PTerm' nm
        PHole : FC -> (bracket : Bool) -> (holename : String) -> PTerm' nm
        PType : FC -> PTerm' nm
        PAs : FC -> (nameFC : FC) -> Name -> (pattern : PTerm' nm) -> PTerm' nm
@@ -188,6 +191,7 @@ mutual
   getPTermLoc (PQuoteName fc _) = fc
   getPTermLoc (PQuoteDecl fc _) = fc
   getPTermLoc (PUnquote fc _) = fc
+  getPTermLoc (PStageQuote fc _) = fc
   getPTermLoc (PRunElab fc _) = fc
   getPTermLoc (PHole fc _ _) = fc
   getPTermLoc (PType fc) = fc
@@ -910,6 +914,7 @@ parameters {0 nm : Type} (toName : nm -> Name)
   showPTermPrec d (PQuoteDecl _ tm) = "`[ <<declaration>> ]"
   showPTermPrec d (PUnquote _ tm) = "~(" ++ showPTermPrec d tm ++ ")"
   showPTermPrec d (PRunElab _ tm) = "%runElab " ++ showPTermPrec d tm
+  showPTermPrec d (PStageQuote _ tm) = "[|| " ++ showPTermPrec d tm ++ " ||]"
   showPTermPrec d (PPrimVal _ c) = showPrec d c
   showPTermPrec _ (PHole _ _ n) = "?" ++ n
   showPTermPrec _ (PType _) = "Type"

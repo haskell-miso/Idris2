@@ -77,6 +77,8 @@ mutual
         = do tag 24; toBuf fc; toBuf t
     toBuf (IRunElab fc re t)
         = do tag 25; toBuf fc; toBuf re; toBuf t
+    toBuf (IStageQuote fc t)
+        = do tag 32; toBuf fc; toBuf t
 
     toBuf (IPrimVal fc y)
         = do tag 26; toBuf fc; toBuf y
@@ -183,6 +185,8 @@ mutual
                         ns <- fromBuf
                         rhs <- fromBuf
                         pure (IWithUnambigNames fc ns rhs)
+               32 => do fc <- fromBuf; y <- fromBuf
+                        pure (IStageQuote fc y)
                31 => do fc <- fromBuf; fn <- fromBuf
                         arg <- fromBuf
                         pure (IAutoApp fc fn arg)

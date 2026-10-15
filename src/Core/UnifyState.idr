@@ -76,6 +76,33 @@ Ord DelayReason where
       tag RecordUpdate = 4
       tag Rewrite = 5
 
+||| Two-level type theory: the state of stage checking while elaborating a
+||| definition.
+public export
+record StageState where
+  constructor MkStageState
+  ||| Are we checking stages? (Not in types, or at the REPL)
+  active : Bool
+  ||| The stage of the definition being elaborated, if known yet. A definition
+  ||| whose stage is still unknown at the end is stage polymorphic.
+  base : Maybe Stage
+  ||| Stages of particular variables bound by the left hand side (for nested
+  ||| definitions which capture variables at different stages)
+  baseVars : NameMap Stage
+  ||| Quotations and splices we are inside, innermost first, with the length
+  ||| of the environment where they start
+  frames : List (Nat, Stage)
+  ||| Did the definition being elaborated contain a splice?
+  usedSplice : Bool
+  ||| Nested definitions (case blocks, local functions) created while
+  ||| elaborating, with the stage they were created at and the stages of the
+  ||| variables they capture
+  nested : NameMap (Maybe Stage, NameMap Stage)
+
+export
+initStageState : StageState
+initStageState = MkStageState False Nothing empty [] False empty
+
 public export
 record UState where
   constructor MkUState
@@ -106,6 +133,7 @@ record UState where
                 -- The 'Int' is the resolved name.
                 -- NameMap () is the set of local hints at the point of delay
   logging : Bool
+  stageState : StageState -- two-level type theory
 
 export
 initUState : UState
@@ -122,6 +150,7 @@ initUState = MkUState
   , nextConstraint = 0
   , delayedElab = []
   , logging = False
+  , stageState = initStageState
   }
 
 export

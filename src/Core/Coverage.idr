@@ -403,6 +403,8 @@ match (As _ _ _ p) p' = match p p'
 match (TDelayed _ _ t) (TDelayed _ _ t') = match t t'
 match (TDelay _ _ _ t) (TDelay _ _ _ t') = match t t'
 match (TForce _ _ t) (TForce _ _ t') = match t t'
+match (TQuote _ _ t) (TQuote _ _ t') = match t t'
+match (TSplice _ t) (TSplice _ t') = match t t'
 match (PrimVal _ c) (PrimVal _ c') = c == c'
 match (Erased _ (Dotted t)) u = match t u
 match t (Erased _ (Dotted u)) = match t u

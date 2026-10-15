@@ -180,6 +180,10 @@ mutual
         = hashWithSalt h 10
     hashWithSalt h (TType fc u)
         = hashWithSalt h 11 `hashWithSalt` u
+    hashWithSalt h (TQuote fc t y)
+        = h `hashWithSalt` 12 `hashWithSalt` t `hashWithSalt` y
+    hashWithSalt h (TSplice fc x)
+        = h `hashWithSalt` 13 `hashWithSalt` x
 
   export
   Hashable Pat where

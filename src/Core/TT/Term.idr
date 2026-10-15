@@ -116,6 +116,13 @@ data Term : Scoped where
      TDelayed : FC -> LazyReason -> Term vars -> Term vars
      TDelay : FC -> LazyReason -> (ty : Term vars) -> (arg : Term vars) -> Term vars
      TForce : FC -> LazyReason -> Term vars -> Term vars
+     -- Two-level type theory (staged compilation).
+     -- A quotation: object level code of type 'ty', as a meta level value of
+     -- type 'Code ty'.
+     TQuote : FC -> (ty : Term vars) -> (tm : Term vars) -> Term vars
+     -- A splice: runs the meta level code in its argument, of type 'Code a',
+     -- and inserts the result in object level code of type 'a'
+     TSplice : FC -> Term vars -> Term vars
      PrimVal : FC -> (c : Constant) -> Term vars
      Erased : FC -> WhyErased (Term vars) -> Term vars
      TType : FC -> Name -> -- universe variable
@@ -126,6 +133,19 @@ data Term : Scoped where
 public export
 ClosedTerm : Type
 ClosedTerm = Term []
+
+------------------------------------------------------------------------
+-- Two-level type theory
+
+||| The type of object level code, 'Language.Staged.Code : Type -> Type'
+export
+codeName : Name
+codeName = NS stagedNS (UN (Basic "Code"))
+
+||| 'Code ty'
+export
+codeType : FC -> Term vars -> Term vars
+codeType fc ty = App fc (Ref fc (TyCon 1) codeName) ty
 
 ------------------------------------------------------------------------
 -- Weakening
@@ -149,6 +169,9 @@ insertNames out ns (TDelayed fc r ty) = TDelayed fc r (insertNames out ns ty)
 insertNames out ns (TDelay fc r ty tm)
     = TDelay fc r (insertNames out ns ty) (insertNames out ns tm)
 insertNames out ns (TForce fc r tm) = TForce fc r (insertNames out ns tm)
+insertNames out ns (TQuote fc ty tm)
+    = TQuote fc (insertNames out ns ty) (insertNames out ns tm)
+insertNames out ns (TSplice fc tm) = TSplice fc (insertNames out ns tm)
 insertNames out ns (PrimVal fc c) = PrimVal fc c
 insertNames out ns (Erased fc Impossible) = Erased fc Impossible
 insertNames out ns (Erased fc Placeholder) = Erased fc Placeholder
@@ -219,6 +242,10 @@ mutual
      = Just (TDelay fc x !(shrinkTerm t prf) !(shrinkTerm y prf))
   shrinkTerm (TForce fc r x) prf
      = Just (TForce fc r !(shrinkTerm x prf))
+  shrinkTerm (TQuote fc t y) prf
+     = Just (TQuote fc !(shrinkTerm t prf) !(shrinkTerm y prf))
+  shrinkTerm (TSplice fc x) prf
+     = Just (TSplice fc !(shrinkTerm x prf))
   shrinkTerm (PrimVal fc c) prf = Just (PrimVal fc c)
   shrinkTerm (Erased fc Placeholder) prf = Just (Erased fc Placeholder)
   shrinkTerm (Erased fc Impossible) prf = Just (Erased fc Impossible)
@@ -255,6 +282,9 @@ mutual
   thinTerm (TDelay fc x t y) th
       = TDelay fc x (thinTerm t th) (thinTerm y th)
   thinTerm (TForce fc r x) th = TForce fc r (thinTerm x th)
+  thinTerm (TQuote fc t y) th
+      = TQuote fc (thinTerm t th) (thinTerm y th)
+  thinTerm (TSplice fc x) th = TSplice fc (thinTerm x th)
   thinTerm (PrimVal fc c) th = PrimVal fc c
   thinTerm (Erased fc Impossible) th = Erased fc Impossible
   thinTerm (Erased fc Placeholder) th = Erased fc Placeholder
@@ -370,6 +400,10 @@ StripNamespace (Term vars) where
       = TDelay fc x (trimNS ns t) (trimNS ns y)
   trimNS ns (TForce fc r y)
       = TForce fc r (trimNS ns y)
+  trimNS ns (TQuote fc t y)
+      = TQuote fc (trimNS ns t) (trimNS ns y)
+  trimNS ns (TSplice fc y)
+      = TSplice fc (trimNS ns y)
   trimNS ns tm = tm
 
   restoreNS ns (Ref fc x nm)
@@ -388,6 +422,10 @@ StripNamespace (Term vars) where
       = TDelay fc x (restoreNS ns t) (restoreNS ns y)
   restoreNS ns (TForce fc r y)
       = TForce fc r (restoreNS ns y)
+  restoreNS ns (TQuote fc t y)
+      = TQuote fc (restoreNS ns t) (restoreNS ns y)
+  restoreNS ns (TSplice fc y)
+      = TSplice fc (restoreNS ns y)
   restoreNS ns tm = tm
 
 
@@ -407,6 +445,8 @@ getLoc (As fc _ _ _) = fc
 getLoc (TDelayed fc _ _) = fc
 getLoc (TDelay fc _ _ _) = fc
 getLoc (TForce fc _ _) = fc
+getLoc (TQuote fc _ _) = fc
+getLoc (TSplice fc _) = fc
 getLoc (PrimVal fc _) = fc
 getLoc (Erased fc i) = fc
 getLoc (TType fc _) = fc
@@ -459,6 +499,8 @@ eqTerm (As _ _ a p) (As _ _ a' p') = eqTerm a a' && eqTerm p p'
 eqTerm (TDelayed _ _ t) (TDelayed _ _ t') = eqTerm t t'
 eqTerm (TDelay _ _ t x) (TDelay _ _ t' x') = eqTerm t t' && eqTerm x x'
 eqTerm (TForce _ _ t) (TForce _ _ t') = eqTerm t t'
+eqTerm (TQuote _ t x) (TQuote _ t' x') = eqTerm t t' && eqTerm x x'
+eqTerm (TSplice _ t) (TSplice _ t') = eqTerm t t'
 eqTerm (PrimVal _ c) (PrimVal _ c') = c == c'
 eqTerm (Erased _ i) (Erased _ i') = assert_total (eqWhyErasedBy eqTerm i i')
 eqTerm (TType {}) (TType {}) = True
@@ -501,6 +543,10 @@ mutual
       = TDelay fc x (resolveNames vars t) (resolveNames vars y)
   resolveNames vars (TForce fc r x)
       = TForce fc r (resolveNames vars x)
+  resolveNames vars (TQuote fc t y)
+      = TQuote fc (resolveNames vars t) (resolveNames vars y)
+  resolveNames vars (TSplice fc x)
+      = TSplice fc (resolveNames vars x)
   resolveNames vars tm = tm
 
 ------------------------------------------------------------------------
@@ -548,6 +594,8 @@ covering
       showApp (TDelayed _ _ tm) [] = "%Delayed " ++ show tm
       showApp (TDelay _ _ _ tm) [] = "%Delay " ++ show tm
       showApp (TForce _ _ tm) [] = "%Force " ++ show tm
+      showApp (TQuote _ _ tm) [] = "[|| " ++ show tm ++ " ||]"
+      showApp (TSplice _ tm) [] = "~(" ++ show tm ++ ")"
       showApp (PrimVal _ c) [] = show c
       showApp (Erased _ (Dotted t)) [] = ".(" ++ show t ++ ")"
       showApp (Erased {}) [] = "[__]"

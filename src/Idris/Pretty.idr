@@ -346,6 +346,7 @@ mutual
          "`" <+> brackets (angles (angles "declaration"))
     prettyPrec d (PUnquote _ tm) = parenthesise (d > startPrec) $ "~" <+> parens (pretty tm)
     prettyPrec d (PRunElab _ tm) = parenthesise (d > startPrec) $ pragma "%runElab" <++> pretty tm
+    prettyPrec d (PStageQuote _ tm) = "[||" <++> pretty tm <++> "||]"
     prettyPrec d (PPrimVal _ c) = pretty c
     prettyPrec d (PHole _ _ n) = hole (pretty0 (strCons '?' n))
     prettyPrec d (PType _) = annotate (TCon Nothing) "Type"

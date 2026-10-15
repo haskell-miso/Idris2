@@ -912,6 +912,8 @@ mapTermM f = goTerm where
     goTerm (TDelayed fc la d) = f =<< TDelayed fc la <$> goTerm d
     goTerm (TDelay fc la ty arg) = f =<< TDelay fc la <$> goTerm ty <*> goTerm arg
     goTerm (TForce fc la t) = f =<< TForce fc la <$> goTerm t
+    goTerm (TQuote fc ty arg) = f =<< TQuote fc <$> goTerm ty <*> goTerm arg
+    goTerm (TSplice fc t) = f =<< TSplice fc <$> goTerm t
     goTerm tm@(PrimVal {}) = f tm
     goTerm tm@(Erased {}) = f tm
     goTerm tm@(TType {}) = f tm

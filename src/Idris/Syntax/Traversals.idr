@@ -90,6 +90,9 @@ mapPTermM f = goPTerm where
     goPTerm (PRunElab fc x) =
       PRunElab fc <$> goPTerm x
       >>= f
+    goPTerm (PStageQuote fc x) =
+      PStageQuote fc <$> goPTerm x
+      >>= f
     goPTerm t@(PHole {}) = f t
     goPTerm t@(PType {}) = f t
     goPTerm (PAs fc nameFC x pat) =
@@ -448,6 +451,8 @@ mapPTerm f = goPTerm where
       = f $ PUnquote fc $ goPTerm x
     goPTerm (PRunElab fc x)
       = f $ PRunElab fc $ goPTerm x
+    goPTerm (PStageQuote fc x)
+      = f $ PStageQuote fc $ goPTerm x
     goPTerm t@(PHole {}) = f t
     goPTerm t@(PType {}) = f t
     goPTerm (PAs fc nameFC x pat)
@@ -640,6 +645,7 @@ substFC fc = mapPTerm $ \case
   PQuoteDecl _ xs => PQuoteDecl fc xs
   PUnquote _ x => PUnquote fc x
   PRunElab _ x => PRunElab fc x
+  PStageQuote _ x => PStageQuote fc x
   PHole _ bracket holename => PHole fc bracket holename
   PType _ => PType fc
   PAs _ _ n pattern => PAs fc fc n pattern

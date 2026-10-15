@@ -114,6 +114,7 @@ parameters (f : RawImp' nm -> RawImp' nm)
   mapTTImp (IQuoteDecl fc xs) = f $ IQuoteDecl fc (assert_total $ map mapImpDecl xs)
   mapTTImp (IUnquote fc t) = f $ IUnquote fc (mapTTImp t)
   mapTTImp (IRunElab fc re t) = f $ IRunElab fc re (mapTTImp t)
+  mapTTImp (IStageQuote fc t) = f $ IStageQuote fc (mapTTImp t)
   mapTTImp (IPrimVal fc c) = f $ IPrimVal fc c
   mapTTImp (IType fc) = f $ IType fc
   mapTTImp (IHole fc str) = f $ IHole fc str

@@ -139,6 +139,10 @@ mutual
       = updateHoleUsage useInHole var zs t
   updateHoleUsage useInHole var zs (TForce _ _ t)
       = updateHoleUsage useInHole var zs t
+  updateHoleUsage useInHole var zs (TQuote _ _ t)
+      = updateHoleUsage useInHole var zs t
+  updateHoleUsage useInHole var zs (TSplice _ t)
+      = updateHoleUsage useInHole var zs t
   updateHoleUsage useInHole var zs tm
       = case getFnArgs tm of
              (Ref _ _ fn, args) =>
@@ -351,6 +355,22 @@ mutual
                     => do defs <- get Ctxt
                           pure (TForce fc r val', glueBack defs env narg, u)
                 _ => throw (GenericMsg fc "Not a delayed type")
+  lcheck rig erase env (TQuote fc ty val)
+      = do log "quantity" 15 "lcheck Quote"
+           (ty', _, _) <- lcheck erased erase env ty
+           (val', _, u) <- lcheck rig erase env val
+           pure (TQuote fc ty' val', gnf env (codeType fc ty), u)
+  lcheck rig erase env (TSplice fc val)
+      = do log "quantity" 15 "lcheck Splice"
+           (val', gty, u) <- lcheck rig erase env val
+           tynf <- getNF gty
+           case tynf of
+                NTCon _ n _ [(_, aty)] =>
+                    if !(getFullName n) == codeName
+                       then do defs <- get Ctxt
+                               pure (TSplice fc val', glueBack defs env !(evalClosure defs aty), u)
+                       else throw (GenericMsg fc "Not a code type")
+                _ => throw (GenericMsg fc "Not a code type")
   lcheck rig erase env (PrimVal fc c)
       = do log "quantity" 15 "lcheck PrimVal"
            pure (PrimVal fc c, gErased fc, [])

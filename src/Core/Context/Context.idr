@@ -200,6 +200,54 @@ Show Clause where
   show (MkClause {vars} env lhs rhs)
       = show vars ++ ": " ++ show lhs ++ " = " ++ show rhs
 
+------------------------------------------------------------------------
+-- Two-level type theory: stages
+
+||| The stages of two-level type theory: meta level (compile time) and
+||| object level (run time)
+public export
+data Stage = SMeta | SObj
+
+export
+Eq Stage where
+  SMeta == SMeta = True
+  SObj == SObj = True
+  _ == _ = False
+
+export
+Show Stage where
+  show SMeta = "meta"
+  show SObj = "object"
+
+||| The stage of a global definition. Definitions without a stage flag are
+||| stage polymorphic: they can be used (and are compiled) at both stages.
+public export
+data DefStage
+    = ||| Only exists at compile time (its type mentions 'Code', or it
+      ||| uses meta level definitions). Never compiled.
+      DMeta
+    | ||| Object level code containing splices, which are run by staging
+      DObj
+    | ||| A nested definition (case block, local function) of object code,
+      ||| which captures meta level variables. The list gives the stage of
+      ||| each argument. Such definitions are specialised to the values of
+      ||| their meta level arguments during staging, and never compiled
+      ||| themselves.
+      DMixed (List Stage)
+
+export
+Eq DefStage where
+  DMeta == DMeta = True
+  DObj == DObj = True
+  DMixed xs == DMixed ys = xs == ys
+  _ == _ = False
+
+export
+Show DefStage where
+  show DMeta = "meta"
+  show DObj = "object"
+  show (DMixed ss) = "mixed " ++ show ss
+
 public export
 data DefFlag
     = Inline
@@ -233,6 +281,9 @@ data DefFlag
     | Identity Nat
          -- Is it the identity function at runtime?
          -- The nat represents which argument the function evaluates to
+    | Staged DefStage
+         -- Two-level type theory: the stage of a definition (absent means
+         -- stage polymorphic)
 %name DefFlag dflag
 
 export
@@ -250,6 +301,7 @@ Eq DefFlag where
     (==) AllGuarded AllGuarded = True
     (==) (ConType x) (ConType y) = x == y
     (==) (Identity x) (Identity y) = x == y
+    (==) (Staged x) (Staged y) = x == y
     (==) _ _ = False
 
 export
@@ -267,6 +319,7 @@ Show DefFlag where
   show AllGuarded = "allguarded"
   show (ConType ci) = "contype " ++ show ci
   show (Identity x) = "identity " ++ show x
+  show (Staged s) = "staged " ++ show s
 
 public export
 record SCCall where

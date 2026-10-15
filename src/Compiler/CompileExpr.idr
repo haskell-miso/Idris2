@@ -184,6 +184,11 @@ toCExpTm n (TDelay fc lr _ arg)
     = pure (CDelay fc lr !(toCExp n arg))
 toCExpTm n (TForce fc lr arg)
     = pure (CForce fc lr !(toCExp n arg))
+-- Quotations only exist at compile time, in meta level code, which is never
+-- compiled
+toCExpTm n (TQuote fc _ _) = pure $ CErased fc
+toCExpTm n (TSplice fc _)
+    = throw (InternalError ("Unstaged splice in " ++ show n ++ " at " ++ show fc))
 toCExpTm n (PrimVal fc $ PrT c) = pure $ CCon fc (UN $ Basic $ show c) TYCON Nothing [] -- Primitive type constant
 toCExpTm n (PrimVal fc c) = pure $ CPrimVal fc c -- Non-type constant
 toCExpTm n (Erased fc _) = pure $ CErased fc

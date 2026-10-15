@@ -122,6 +122,9 @@ fuzzySearch expr = do
   doFind ns (TDelay fc x t y)
       = doFind (doFind ns t) y
   doFind ns (TForce fc r x) = doFind ns x
+  doFind ns (TQuote fc t y)
+      = doFind (doFind ns t) y
+  doFind ns (TSplice fc x) = doFind ns x
   doFind ns (PrimVal fc c) =
     fromMaybe [] ((:: []) <$> parseNameOrConst (PPrimVal fc c)) ++ ns
   doFind ns (Erased fc i) = ns

@@ -28,6 +28,8 @@ bindable p tm
            (TDelayed _ _ t, args) => any (bindable p) (t :: args)
            (TDelay _ _ _ t, args) => any (bindable p) (t :: args)
            (TForce _ _ t, args) => any (bindable p) (t :: args)
+           (TQuote _ _ t, args) => any (bindable p) (t :: args)
+           (TSplice _ t, args) => any (bindable p) (t :: args)
            (Local _ _ p' _, []) => p == p'
            _ => False
 

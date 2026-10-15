@@ -35,6 +35,9 @@ substTerm outer dropped env (TDelayed fc x y) = TDelayed fc x (substTerm outer d
 substTerm outer dropped env (TDelay fc x t y)
     = TDelay fc x (substTerm outer dropped env t) (substTerm outer dropped env y)
 substTerm outer dropped env (TForce fc r x) = TForce fc r (substTerm outer dropped env x)
+substTerm outer dropped env (TQuote fc t y)
+    = TQuote fc (substTerm outer dropped env t) (substTerm outer dropped env y)
+substTerm outer dropped env (TSplice fc x) = TSplice fc (substTerm outer dropped env x)
 substTerm outer dropped env (PrimVal fc c) = PrimVal fc c
 substTerm outer dropped env (Erased fc Impossible) = Erased fc Impossible
 substTerm outer dropped env (Erased fc Placeholder) = Erased fc Placeholder

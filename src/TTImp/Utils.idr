@@ -107,6 +107,10 @@ findBindableNames arg env used (IDelay fc t)
     = findBindableNames arg env used t
 findBindableNames arg env used (IForce fc t)
     = findBindableNames arg env used t
+findBindableNames arg env used (IStageQuote fc t)
+    = findBindableNames arg env used t
+findBindableNames arg env used (IUnquote fc t)
+    = findBindableNames arg env used t
 findBindableNames arg env used (IQuote fc t)
     = findBindableNamesQuot env used t
 findBindableNames arg env used (IQuoteDecl fc d)
@@ -159,6 +163,8 @@ findBindableNamesQuot env used (IDelayed fc x y)
 findBindableNamesQuot env used (IDelay fc x)
     = findBindableNamesQuot env used x
 findBindableNamesQuot env used (IForce fc x)
+    = findBindableNamesQuot env used x
+findBindableNamesQuot env used (IStageQuote fc x)
     = findBindableNamesQuot env used x
 findBindableNamesQuot env used (IUnquote fc x)
     = findBindableNames True env used x
@@ -243,6 +249,8 @@ findAllNames env (IQuote fc t)
     = findAllNames env t
 findAllNames env (IUnquote fc t)
     = findAllNames env t
+findAllNames env (IStageQuote fc t)
+    = findAllNames env t
 findAllNames env (IAlternative fc u alts)
     = concatMap (findAllNames env) alts
 findAllNames env (IUpdate fc updates tm)
@@ -276,6 +284,10 @@ findIBindVars (IDelayed fc r t)
 findIBindVars (IDelay fc t)
     = findIBindVars t
 findIBindVars (IForce fc t)
+    = findIBindVars t
+findIBindVars (IStageQuote fc t)
+    = findIBindVars t
+findIBindVars (IUnquote fc t)
     = findIBindVars t
 findIBindVars (IAlternative fc u alts)
     = concatMap findIBindVars alts
@@ -345,6 +357,10 @@ mutual
       = IDelay fc (substNames' bvar bound ps t)
   substNames' bvar bound ps (IForce fc t)
       = IForce fc (substNames' bvar bound ps t)
+  substNames' bvar bound ps (IStageQuote fc t)
+      = IStageQuote fc (substNames' bvar bound ps t)
+  substNames' bvar bound ps (IUnquote fc t)
+      = IUnquote fc (substNames' bvar bound ps t)
   substNames' bvar bound ps (IUpdate fc updates tm)
       = IUpdate fc (map (mapFieldUpdateTerm $ substNames' bvar bound ps) updates)
                    (substNames' bvar bound ps tm)
@@ -446,6 +462,10 @@ mutual
       = IDelay fc' (substLoc fc' t)
   substLoc fc' (IForce fc t)
       = IForce fc' (substLoc fc' t)
+  substLoc fc' (IStageQuote fc t)
+      = IStageQuote fc' (substLoc fc' t)
+  substLoc fc' (IUnquote fc t)
+      = IUnquote fc' (substLoc fc' t)
   substLoc fc' (IUpdate fc updates tm)
       = IUpdate fc' (map (mapFieldUpdateTerm $ substLoc fc') updates)
                     (substLoc fc' tm)

@@ -218,12 +218,15 @@ export
 groupSymbols : List String
 groupSymbols = [".(", -- for things such as Foo.Bar.(+)
     ".[|", -- for namespaced brackets such as Foo.Bar.[| x + y |]
-    "@{", "[|", "(", "{", "[<", "[>", "[", "`(", "`{", "`["]
+    "@{",
+    "[||", -- for staged quotations [|| e ||] (must come before "[|")
+    "[|", "(", "{", "[<", "[>", "[", "`(", "`{", "`["]
 
 export
 groupClose : String -> String
 groupClose ".(" = ")"
 groupClose "@{" = "}"
+groupClose "[||" = "||]"
 groupClose "[|" = "|]"
 groupClose ".[|" = "|]"
 groupClose "(" = ")"

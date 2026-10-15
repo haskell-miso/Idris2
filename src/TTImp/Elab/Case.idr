@@ -46,6 +46,10 @@ changeVar old new (TDelay fc r t p)
     = TDelay fc r (changeVar old new t) (changeVar old new p)
 changeVar old new (TForce fc r p)
     = TForce fc r (changeVar old new p)
+changeVar old new (TQuote fc t p)
+    = TQuote fc (changeVar old new t) (changeVar old new p)
+changeVar old new (TSplice fc p)
+    = TSplice fc (changeVar old new p)
 changeVar old new tm = tm
 
 toRig1 : {idx : Nat} -> (0 p : IsVar nm idx vs) -> Env Term vs -> Env Term vs

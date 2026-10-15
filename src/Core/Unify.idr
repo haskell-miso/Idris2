@@ -478,6 +478,8 @@ tryInstantiate {newvars} loc mode env mname mref num mdef locs otm tm
     noMeta (TDelayed _ _ t) d = noMeta t d
     noMeta (TDelay _ _ t a) d = noMeta t d && noMeta a d
     noMeta (TForce _ _ t) d = noMeta t d
+    noMeta (TQuote _ t a) d = noMeta t d && noMeta a d
+    noMeta (TSplice _ t) d = noMeta t d
     noMeta (As _ _ a p) d = noMeta a d && noMeta p d
     noMeta (Local {}) _ = True
     noMeta (Ref {}) _ = True
@@ -549,6 +551,10 @@ tryInstantiate {newvars} loc mode env mname mref num mdef locs otm tm
         = Just (TDelay fc r !(updateIVars ivs ty) !(updateIVars ivs arg))
     updateIVars ivs (TForce fc r arg)
         = Just (TForce fc r !(updateIVars ivs arg))
+    updateIVars ivs (TQuote fc ty arg)
+        = Just (TQuote fc !(updateIVars ivs ty) !(updateIVars ivs arg))
+    updateIVars ivs (TSplice fc arg)
+        = Just (TSplice fc !(updateIVars ivs arg))
     updateIVars ivs (PrimVal fc c) = Just (PrimVal fc c)
     updateIVars ivs (Erased fc Impossible) = Just (Erased fc Impossible)
     updateIVars ivs (Erased fc Placeholder) = Just (Erased fc Placeholder)
@@ -1197,6 +1203,31 @@ mutual
       = do cs <- unify (lower mode) loc env x y
            cs' <- unifyArgs mode loc env (map snd axs) (map snd ays)
            pure (union cs cs')
+  unifyNoEta mode loc env (NQuote xfc xty x) (NQuote yfc yty y)
+      = unifyArgs mode loc env [xty, x] [yty, y]
+  unifyNoEta mode loc env (NSplice xfc x axs) (NSplice yfc y ays)
+      = do cs <- unify (lower mode) loc env x y
+           cs' <- unifyArgs mode loc env (map snd axs) (map snd ays)
+           pure (union cs cs')
+  -- eta for quotations: [|| ~x ||] = x
+  unifyNoEta mode loc env x@(NQuote xfc _ xarg) y
+      = do defs <- get Ctxt
+           xnf <- evalClosure defs xarg
+           case xnf of
+                NSplice _ x' [] => unify (lower mode) loc env x' y
+                _ => case y of
+                          NApp yfc hd args =>
+                               unifyApp True mode loc env yfc hd args x
+                          _ => convertError loc env x y
+  unifyNoEta mode loc env x y@(NQuote yfc _ yarg)
+      = do defs <- get Ctxt
+           ynf <- evalClosure defs yarg
+           case ynf of
+                NSplice _ y' [] => unify (lower mode) loc env x y'
+                _ => case x of
+                          NApp xfc hd args =>
+                               unifyApp False (lower mode) loc env xfc hd args y
+                          _ => convertError loc env x y
   unifyNoEta mode loc env x@(NApp xfc fx@(NMeta {}) axs)
                           y@(NApp yfc fy@(NMeta {}) ays)
       = do defs <- get Ctxt

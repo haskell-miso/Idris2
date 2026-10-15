@@ -77,6 +77,13 @@ tryReplace ms (TDelay fc r ty tm)
 tryReplace ms (TForce fc r tm)
     = do tm' <- tryReplace ms tm
          pure (TForce fc r tm')
+tryReplace ms (TQuote fc ty tm)
+    = do ty' <- tryReplace ms ty
+         tm' <- tryReplace ms tm
+         pure (TQuote fc ty' tm')
+tryReplace ms (TSplice fc tm)
+    = do tm' <- tryReplace ms tm
+         pure (TSplice fc tm')
 tryReplace ms (PrimVal fc c) = pure (PrimVal fc c)
 tryReplace ms (Erased fc Impossible) = pure (Erased fc Impossible)
 tryReplace ms (Erased fc Placeholder) = pure (Erased fc Placeholder)
@@ -138,6 +145,13 @@ trans env stk (TDelay fc r ty tm)
 trans env stk (TForce fc r tm)
     = do tm' <- trans env [] tm
          pure $ unload stk (TForce fc r tm')
+trans env stk (TQuote fc ty tm)
+    = do ty' <- trans env [] ty
+         tm' <- trans env [] tm
+         pure $ unload stk (TQuote fc ty' tm')
+trans env stk (TSplice fc tm)
+    = do tm' <- trans env [] tm
+         pure $ unload stk (TSplice fc tm')
 trans env stk tm = pure $ unload stk tm
 
 covering

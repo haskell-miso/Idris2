@@ -156,6 +156,19 @@ parameters (defs : Defs) (topopts : EvalOpts)
                   NDelay fc r _ arg =>
                       eval env (arg :: locs) (Local {name = UN (Basic "fvar")} fc Nothing _ First) stk
                   _ => pure (NForce fc r tm' stk)
+    -- [|| ~e ||] = e
+    eval env locs (TQuote fc ty (TSplice _ tm)) stk
+        = eval env locs tm stk
+    eval env locs (TQuote fc ty tm) stk
+        = pure (NQuote fc (mkClosure topopts locs env ty)
+                          (mkClosure topopts locs env tm))
+    -- ~[|| e ||] = e
+    eval env locs (TSplice fc tm) stk
+        = do tm' <- eval env locs tm []
+             case tm' of
+                  NQuote fc _ arg =>
+                      eval env (arg :: locs) (Local {name = UN (Basic "fvar")} fc Nothing _ First) stk
+                  _ => pure (NSplice fc tm' stk)
     eval env locs (PrimVal fc c) stk = pure $ NPrimVal fc c
     eval env locs (Erased fc a) stk
       = NErased fc <$> traverse @{%search} @{CORE} (\ t => eval env locs t stk) a
@@ -207,6 +220,14 @@ parameters (defs : Defs) (topopts : EvalOpts)
                  NDelay fc r _ arg =>
                     eval env [arg] (Local {name = UN (Basic "fvar")} fc Nothing _ First) stk
                  _ => pure (NForce fc r tm' (args ++ stk))
+    applyToStack env nf@(NQuote {}) stk
+       = pure nf -- stack should always be empty here!
+    applyToStack env (NSplice fc tm args) stk
+       = do tm' <- applyToStack env tm []
+            case tm' of
+                 NQuote fc _ arg =>
+                    eval env [arg] (Local {name = UN (Basic "fvar")} fc Nothing _ First) (args ++ stk)
+                 _ => pure (NSplice fc tm' (args ++ stk))
     applyToStack env nf@(NPrimVal fc _) _ = pure nf
     applyToStack env (NErased fc a) stk
       = NErased fc <$> traverse @{%search} @{CORE} (\ t => applyToStack env t stk) a
@@ -409,6 +430,7 @@ parameters (defs : Defs) (topopts : EvalOpts)
         concrete (NBind {}) = True
         concrete (NType {}) = True
         concrete (NDelay {}) = True
+        concrete (NQuote {}) = True
         concrete _ = False
     tryAlt _ _ _ _ _ _ _ = pure GotStuck
 

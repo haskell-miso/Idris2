@@ -216,6 +216,10 @@ mutual
       = findUsed env (findUsed env used ty) tm
   findUsed env used (TForce fc r tm)
       = findUsed env used tm
+  findUsed env used (TQuote fc ty tm)
+      = findUsed env (findUsed env used ty) tm
+  findUsed env used (TSplice fc tm)
+      = findUsed env used tm
   findUsed env used (Erased fc (Dotted tm))
       = findUsed env used tm
   findUsed env used _ = used
