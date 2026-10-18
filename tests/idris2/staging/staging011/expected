@@ -1,0 +1,72 @@
+---- sumEvenSquares
+-- type: Int -> Int
+\n : Int =>
+  letrec
+    loop : Int -> Int -> Int = \acc : Int, s : Int =>
+        case s > n of
+          0 => case (s `mod` 2) == 0 of
+              0 => loop acc (s + 1)
+              _ => loop (acc + (s * s)) (s + 1)
+          _ => acc
+  in loop 0 1
+#include <stdint.h>
+#include <stdlib.h>
+#include <stdio.h>
+#include <string.h>
+#include <math.h>
+
+static inline double void2double(void* p) { double d; memcpy(&d, &p, sizeof d); return d; }
+static inline void* double2void(double d) { void* p = 0; memcpy(&p, &d, sizeof d); return p; }
+
+
+static int64_t loop(int64_t n, int64_t acc, int64_t s);
+static int64_t loop(int64_t n, int64_t acc, int64_t s) {
+  int64_t r_0;
+  switch ((s > n)) {
+  case 0: {
+  int64_t r_1;
+  switch (((s % 2) == 0)) {
+  case 0: {
+  r_1 = loop(n, acc, (s + 1)); break; }
+  default: {
+  r_1 = loop(n, (acc + (s * s)), (s + 1)); break; }
+  }
+  r_0 = r_1; break; }
+  default: {
+  r_0 = acc; break; }
+  }
+  return r_0;
+}
+
+int64_t sum_even_squares(int64_t n) {
+  return loop(n, 0, 1);
+}
+---- divDiv
+-- type: Int -> Int -> Int -> Maybe Int
+-- data Maybe #0 = Nothing | Just #0
+\a : Int, b : Int, c : Int =>
+  case b == 0 of
+    0 => let a_11 : Int = a `div` b
+      in case c == 0 of
+           0 => Just ((a_11 `div` c) + 1)
+           _ => Nothing
+    _ => Nothing
+---- hypot
+#include <stdint.h>
+#include <stdlib.h>
+#include <stdio.h>
+#include <string.h>
+#include <math.h>
+
+static inline double void2double(void* p) { double d; memcpy(&d, &p, sizeof d); return d; }
+static inline void* double2void(double d) { void* p = 0; memcpy(&p, &d, sizeof d); return p; }
+
+
+
+double hypot2(double x, double y) {
+  return sqrt(((x * x) + (y * y)));
+}
+---- run
+220
+(Just 11, (Nothing, Nothing))
+5.0

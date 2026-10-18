@@ -64,7 +64,7 @@ mutual
       = do tm' <- chk env tm
            case !(getNF tm') of
                 NTCon _ n _ [(_, aty)] =>
-                    if !(getFullName n) == codeName
+                    if isCodeTyName !(getFullName n)
                        then do defs <- get Ctxt
                                pure $ glueBack defs env !(evalClosure defs aty)
                        else throw (GenericMsg fc "Not a code type")

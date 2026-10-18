@@ -522,6 +522,7 @@ isTerminator (Symbol "}") = True
 isTerminator (Symbol ")") = True
 isTerminator (Symbol "|") = True
 isTerminator (Symbol "**") = True
+isTerminator (Symbol "||]") = True
 isTerminator (Keyword "in") = True
 isTerminator (Keyword "then") = True
 isTerminator (Keyword "else") = True

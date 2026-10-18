@@ -1,0 +1,52 @@
+---- sumSq, reflected
+-- type: Int -> Int
+\n : Int =>
+  letrec
+    go : Int -> Int -> Int = \i : Int, acc : Int =>
+        case i > n of
+          0 => go (i + 1) (acc + (i * i))
+          _ => acc
+  in go 1 0
+---- scaledArea, C
+#include <stdint.h>
+#include <stdlib.h>
+#include <stdio.h>
+#include <string.h>
+#include <math.h>
+
+static inline double void2double(void* p) { double d; memcpy(&d, &p, sizeof d); return d; }
+static inline void* double2void(double d) { void* p = 0; memcpy(&p, &d, sizeof d); return p; }
+
+enum { Shape_Circle = 0, Shape_Rect = 1 };
+struct Shape { int tag; union { struct { double f0; } Circle; struct { double f0; double f1; } Rect; } u; };
+
+
+double scaled_area(double k, struct Shape* s) {
+  double r_0;
+  switch (s->tag) {
+  case Shape_Circle: {
+  double r = s->u.Circle.f0;
+  r_0 = (((3.0 * r) * r) * k); break; }
+  case Shape_Rect: {
+  double w = s->u.Rect.f0;
+  double h = s->u.Rect.f1;
+  r_0 = ((w * h) * k); break; }
+  default: abort();
+  }
+  return r_0;
+}
+---- firstBig, reflected
+-- type: Int -> List Int -> Maybe Int
+-- data List #0 = Nil | (::) #0 List #0
+-- data Maybe #0 = Nothing | Just #0
+\n : Int, xs : List Int =>
+  letrec
+    go : List Int -> Maybe Int = \l : List Int =>
+        case l of
+          [] => Nothing
+          x :: r => case n < x of
+              0 => go r
+              _ => Just x
+  in go xs
+---- run
+(385, (24.0, Just 7))

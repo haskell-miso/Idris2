@@ -262,6 +262,11 @@ export
 stagedNS : Namespace
 stagedNS = mkNamespace "Language.Staged"
 
+||| The namespace of closure free (low) code
+export
+lowNS : Namespace
+lowNS = mkNamespace "Language.Staged.Low"
+
 export
 numNS : Namespace
 numNS = mkNamespace "Prelude.Num"

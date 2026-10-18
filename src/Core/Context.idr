@@ -1609,6 +1609,28 @@ mkCodeType fc ty
          let n = maybe codeName Resolved (getNameID codeName (gamma defs))
          pure (App fc (Ref fc (TyCon 1) n) ty)
 
+||| 'Low ty', with the name of 'Low' resolved
+export
+mkLowType : {auto c : Ref Ctxt Defs} -> FC -> Term vars -> Core (Term vars)
+mkLowType fc ty
+    = do defs <- get Ctxt
+         let n = maybe lowName Resolved (getNameID lowName (gamma defs))
+         pure (App fc (Ref fc (TyCon 1) n) ty)
+
+||| A global function in 'Language.Staged.Low', with its name resolved
+export
+lowLibRef : {auto c : Ref Ctxt Defs} -> FC -> String -> Core (Term vars)
+lowLibRef fc s
+    = do defs <- get Ctxt
+         let n = lowLibName s
+         Just def <- lookupCtxtExact n (gamma defs)
+              | Nothing => throw (GenericMsg fc ("Low code needs " ++ show n ++ ": import Language.Staged.Low"))
+         let nt = case definition def of
+                       DCon t a _ => DataCon t a
+                       TCon a _ _ _ _ _ _ => TyCon a
+                       _ => Func
+         pure (Ref fc nt (maybe n Resolved (getNameID n (gamma defs))))
+
 ||| The stage flag of a global definition, if any
 export
 defStage : GlobalDef -> Maybe DefStage

@@ -35,6 +35,7 @@ import Idris.Pretty
 import Idris.Doc.String
 
 import Data.SortedMap
+import Libraries.Data.NameMap
 import Data.String
 
 import System.File
@@ -121,6 +122,49 @@ readModule full loc vis imp as
                           let as = snd (snd mimp)
                           when (reexp || full) $ readModule full loc reexp m as) more
          setNS modNS
+
+||| Load the modules which the imported modules import but don't reexport.
+||| Staged code runs meta programs at compile time, and these may use
+||| definitions from any of those modules.
+loadAllDeps : {auto c : Ref Ctxt Defs} ->
+              {auto u : Ref UST UState} ->
+              {auto s : Ref Syn SyntaxInfo} ->
+              FC -> Core ()
+loadAllDeps loc
+    = do -- The modules are loaded for their definitions only: they aren't
+         -- imported, so their hints mustn't change the elaboration of the
+         -- module
+         defs <- get Ctxt
+         let th = typeHints defs
+         let ah = autoHints defs
+         let oh = openHints defs
+         syn <- get Syn
+         ust <- get UST
+         ns <- getNS
+         go []
+         put UST ust
+         update Ctxt { typeHints := th, autoHints := ah, openHints := oh }
+         put Syn syn
+         setNS ns
+  where
+    loaded : Defs -> List ModuleIdent
+    loaded defs = map (fst . getNSas) (allImported defs)
+
+    loadDep : (ModuleIdent, Bool, Namespace) -> Core ()
+    loadDep (m, _, as)
+        = do defs <- get Ctxt
+             unless (m `elem` loaded defs) $
+               readModule True loc False m as
+
+    go : List String -> Core ()
+    go done
+        = do defs <- get Ctxt
+             case filter (\f => not (f `elem` done)) (map fst (allImported defs)) of
+                  [] => pure ()
+                  (fname :: _) =>
+                      do imps <- readImportList fname
+                         traverse_ loadDep imps
+                         go (fname :: done)
 
 readImport : {auto c : Ref Ctxt Defs} ->
              {auto u : Ref UST UState} ->
@@ -379,6 +423,12 @@ processMod sourceFileName ttcFileName msg sourcecode origin
                 -- changes the interface - will need to store a hash in .ttc!)
                 logTime 2 "Reading imports" $
                    traverse_ (readImport False) allImports
+                -- Staged modules evaluate meta programs at compile time
+                defs <- get Ctxt
+                staged <- isJust <$> lookupCtxtExact codeName (gamma defs)
+                when staged $
+                  logTime 2 "Reading all dependencies (staging)" $
+                    loadAllDeps mod.headerLoc
 
                 -- Before we process the source, make sure the "hide_everywhere"
                 -- names are set to private (TODO, maybe if we want this?)

@@ -366,7 +366,7 @@ mutual
            tynf <- getNF gty
            case tynf of
                 NTCon _ n _ [(_, aty)] =>
-                    if !(getFullName n) == codeName
+                    if isCodeTyName !(getFullName n)
                        then do defs <- get Ctxt
                                pure (TSplice fc val', glueBack defs env !(evalClosure defs aty), u)
                        else throw (GenericMsg fc "Not a code type")

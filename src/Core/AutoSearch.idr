@@ -1,6 +1,7 @@
 module Core.AutoSearch
 
 import Core.Context.Log
+import Core.LowRep
 import Core.Env
 import Core.Normalise
 import Core.Unify
@@ -531,7 +532,11 @@ searchType {vars} fc rigc defaults trying depth def checkdets top env target
          case nty of
               NTCon tfc tyn a args =>
                   if a == length args
-                     then do logNF "auto" 10 "Next target" env nty
+                     then do -- Two-level type theory: the representation of
+                             -- a concrete type in closure free code
+                             Nothing <- lowRepBuiltin fc def env nty
+                               | Just r => pure r
+                             logNF "auto" 10 "Next target" env nty
                              sd <- getSearchData fc defaults tyn
                              -- Check determining arguments are okay for 'args'
                              when checkdets $

@@ -30,6 +30,7 @@ import TTImp.TTImp
 import TTImp.TTImp.Functor
 import TTImp.ProcessType
 import TTImp.Unelab
+import TTImp.LowQuote
 import TTImp.Unstage
 import TTImp.WithClause
 
@@ -787,7 +788,7 @@ mkRunTime fc n
     toErased fc spec (_ ** (env, lhs, rhs))
         = do lhs_erased <- linearCheck fc linear True env lhs
              -- Two-level type theory: run the splices
-             rhs <- unstage env rhs
+             rhs <- unstage n env rhs
              -- Partially evaluate RHS here, where appropriate
              rhs' <- applyTransforms env rhs
              rhs' <- applySpecialise env spec rhs'
@@ -806,10 +807,13 @@ compileRunTime : {auto c : Ref Ctxt Defs} ->
                  FC -> Name -> Core ()
 compileRunTime fc atotal
     = do defs <- get Ctxt
-         traverse_ (mkRunTime fc) (toCompileCase defs)
-         traverse_ (calcRefs True atotal) (toCompileCase defs)
-
+         let todo = toCompileCase defs
+         -- Clear the list first: building the run time trees can elaborate
+         -- more definitions (the read back of staged low code), which are
+         -- added to the list and compiled in their turn
          update Ctxt { toCompileCase := [] }
+         traverse_ (mkRunTime fc) todo
+         traverse_ (calcRefs True atotal) todo
 
 toPats : Clause -> (vs ** (Env Term vs, Term vs, Term vs))
 toPats (MkClause {vars} env lhs rhs)
@@ -935,12 +939,18 @@ processDef opts nest env fc n_in cs_in
          putStageState ({ nested := nested st } oldst)
          let stage = defStageOf st (maybe [] (snd . snd) nestedInfo)
          log "declare.def.stage" 5 $ show n ++ " is at stage " ++ show stage
+         -- Closure free code: translate the quotations of low code
+         let isMetaDef = case stage of
+                              Just DMeta => True
+                              _ => False
+         cs' <- traverse (lowerClause fc n isMetaDef (maybe empty (fst . snd) nestedInfo))
+                         (rights cs)
 
-         let pats = map toPats (rights cs)
+         let pats = map toPats cs'
 
          (cargs ** (tree_ct, unreachable)) <-
              logTime 3 ("Building compile time case tree for " ++ show n) $
-                getPMDef fc (CompileTime mult) n ty (rights cs)
+                getPMDef fc (CompileTime mult) n ty cs'
 
          traverse_ warnUnreachable unreachable
 

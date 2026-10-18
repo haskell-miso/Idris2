@@ -1,0 +1,42 @@
+1/1: Building LowErrors (LowErrors.idr)
+Error: low code: the lambda bound variable g must have a value type (first order data), not Int -> Int
+
+LowErrors:7:15--7:16
+ 3 | import Language.Staged.Low
+ 4 |
+ 5 | -- Low code is first order: a function is not a value
+ 6 | higher : Low ((Int -> Int) -> Int)
+ 7 | higher = [|| \g => g 1 ||]
+                   ^
+
+Error: low code: a field of Prelude.Basics.(::) must have a value type (first order data), not Int -> Int
+
+LowErrors:11:17--11:20
+ 07 | higher = [|| \g => g 1 ||]
+ 08 |
+ 09 | -- Data can't contain functions
+ 10 | funList : Low Int -> Low (List (Int -> Int))
+ 11 | funList x = [|| [\y => y + ~x] ||]
+                      ^^^
+
+Error: low code: an interface implementation is not known when the code is generated (low code is monomorphic)
+
+LowErrors:15:14--15:21
+ 11 | funList x = [|| [\y => y + ~x] ||]
+ 12 |
+ 13 | -- Low code is monomorphic: which implementation is used must be known
+ 14 | poly : Num a => Low a -> Low a
+ 15 | poly x = [|| ~x + ~x ||]
+                   ^^^^^^^
+
+1/1: Building CodeInLow (CodeInLow.idr)
+Error: While processing right hand side of f. Only Low code can be spliced into low code
+
+CodeInLow:8:11--8:13
+ 4 | import Language.Staged.Low
+ 5 |
+ 6 | -- Only Low code can be spliced into low code
+ 7 | f : Code Int -> Low Int
+ 8 | f c = [|| ~c + 1 ||]
+               ^^
+

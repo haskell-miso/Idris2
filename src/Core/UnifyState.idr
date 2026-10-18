@@ -51,6 +51,7 @@ data DelayReason
       | RecordUpdate
       | Rewrite
       | LazyDelay
+      | QuoteKind -- 2LTT: a quotation whose kind (Code or Low) isn't known yet
 
 public export
 Eq DelayReason where
@@ -59,6 +60,7 @@ Eq DelayReason where
   RecordUpdate == RecordUpdate = True
   Rewrite == Rewrite = True
   LazyDelay == LazyDelay = True
+  QuoteKind == QuoteKind = True
   _ == _ = False
 
 public export
@@ -75,6 +77,7 @@ Ord DelayReason where
       tag LazyDelay = 3
       tag RecordUpdate = 4
       tag Rewrite = 5
+      tag QuoteKind = 6
 
 ||| Two-level type theory: the state of stage checking while elaborating a
 ||| definition.
@@ -92,6 +95,9 @@ record StageState where
   ||| Quotations and splices we are inside, innermost first, with the length
   ||| of the environment where they start
   frames : List (Nat, Stage)
+  ||| The kinds of the quotations we are inside, innermost first: True for a
+  ||| quotation of closure free code (Low), False for Code
+  quoteKinds : List Bool
   ||| Did the definition being elaborated contain a splice?
   usedSplice : Bool
   ||| Nested definitions (case blocks, local functions) created while
@@ -101,7 +107,7 @@ record StageState where
 
 export
 initStageState : StageState
-initStageState = MkStageState False Nothing empty [] False empty
+initStageState = MkStageState False Nothing empty [] [] False empty
 
 public export
 record UState where

@@ -32,13 +32,10 @@
 module Language.Staged
 
 import Data.List
+import public Language.Staged.Code
 
 %default total
 
-||| The type of object level code of type 'a'. Values of 'Code a' only exist
-||| at compile time; they are built with quotations, and used by splices.
-public export
-data Code : Type -> Type where
 
 --------------------------------------------------------------------------
 -- Lifting meta level values to object level code ("serialisation")

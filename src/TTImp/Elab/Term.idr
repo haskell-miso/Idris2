@@ -306,7 +306,7 @@ TTImp.Elab.Check.check rigc elabinfo nest env tm_in exp
               _ => do -- Two-level type theory: the argument of 'Code' is
                       -- an object level type
                       Nothing <- isCodeApp tm
-                          | Just (fc, arg) => checkCodeApp rigc elabinfo nest env fc arg exp
+                          | Just (fc, arg, low) => checkCodeApp rigc elabinfo nest env fc arg low exp
                       -- Insert quotations and splices the types tell us
                       -- we need
                       tm <- insertStageCoercion nest env tm exp

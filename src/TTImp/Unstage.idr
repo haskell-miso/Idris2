@@ -39,7 +39,13 @@ import Core.Normalise
 import Core.Normalise.Quote
 import Core.TT
 import Core.UnifyState
+import Core.Metadata
 import Core.Value
+
+import Idris.REPL.Opts
+import Idris.Syntax
+
+import TTImp.LowUnstage
 
 import Libraries.Data.NameMap
 import Libraries.Data.WithDefault
@@ -52,10 +58,14 @@ import Libraries.Data.NatSet
 
 %default covering
 
+||| The definition being staged
+data StageDef : Type where
+
 -- Meta level code is run with everything visible (it only runs at compile
 -- time)
 stageOpts : EvalOpts
-stageOpts = withAll
+stageOpts = { strategy := CBV } withAll -- Idris is strict: this is how meta
+                                        -- programs run, with sharing
 
 qopts : QuoteOpts
 qopts = MkQuoteOpts True False Nothing
@@ -194,6 +204,9 @@ mutual
   ||| under while staging, and 'benv' is the environment of the output.
   stageTm : {auto c : Ref Ctxt Defs} ->
             {auto q : Ref QVar Int} ->
+            {auto m : Ref MD Metadata} -> {auto u : Ref UST UState} ->
+            {auto s : Ref Syn SyntaxInfo} -> {auto o : Ref ROpts REPLOpts} ->
+            {auto dn : Ref StageDef Name} ->
             {bound, free, cvars : _} ->
             Bounds bound -> Env Term (bound ++ free) ->
             Env Term free -> LocalEnv free cvars ->
@@ -205,7 +218,7 @@ mutual
       = pure (Meta fc n i !(traverse (stageTm bounds benv env locs) args))
   stageTm bounds benv env locs (Bind fc x b sc)
       = do b' <- traverse (stageTm bounds benv env locs) b
-           xn <- genName (nameRoot x)
+           xn <- Quote.genName (nameRoot x)
            let var = MkNFClosure stageOpts env (NApp fc (NRef Bound xn) [])
            sc' <- stageTm (Add x xn bounds) (b' :: benv) env (var :: locs) sc
            pure (Bind fc x b' sc')
@@ -233,7 +246,10 @@ mutual
            nf <- evalClosure defs (MkClosure stageOpts locs env e)
            case nf of
                 NQuote _ _ body => stageClosure bounds benv env body
-                _ => do tm <- quoteGenNF q qopts defs bounds env nf
+                _ => do -- closure free code: read back as object code
+                        Nothing <- lowSplice fc !(get StageDef) env bounds benv nf
+                             | Just tm => pure tm
+                        tm <- quoteGenNF q qopts defs bounds env nf
                         throw (GenericMsg fc
                                  ("Staging: the splice did not compute to object code, but got stuck at " ++
                                   show !(toFullNames tm)))
@@ -246,6 +262,9 @@ mutual
 
   stageLocal : {auto c : Ref Ctxt Defs} ->
                {auto q : Ref QVar Int} ->
+            {auto m : Ref MD Metadata} -> {auto u : Ref UST UState} ->
+            {auto s : Ref Syn SyntaxInfo} -> {auto o : Ref ROpts REPLOpts} ->
+            {auto dn : Ref StageDef Name} ->
                {bound, free, cvars : _} ->
                Bounds bound -> Env Term free ->
                FC -> Maybe Bool ->
@@ -274,6 +293,9 @@ mutual
   ||| Stage the body of a quotation
   stageClosure : {auto c : Ref Ctxt Defs} ->
                  {auto q : Ref QVar Int} ->
+            {auto m : Ref MD Metadata} -> {auto u : Ref UST UState} ->
+            {auto s : Ref Syn SyntaxInfo} -> {auto o : Ref ROpts REPLOpts} ->
+            {auto dn : Ref StageDef Name} ->
                  {bound, free : _} ->
                  Bounds bound -> Env Term (bound ++ free) -> Env Term free ->
                  Closure free -> Core (Term (bound ++ free))
@@ -299,6 +321,9 @@ mutual
   ||| level arguments
   specialiseCall : {auto c : Ref Ctxt Defs} ->
                    {auto q : Ref QVar Int} ->
+            {auto m : Ref MD Metadata} -> {auto u : Ref UST UState} ->
+            {auto s : Ref Syn SyntaxInfo} -> {auto o : Ref ROpts REPLOpts} ->
+            {auto dn : Ref StageDef Name} ->
                    {bound, free, cvars : _} ->
                    Bounds bound -> Env Term (bound ++ free) ->
                    Env Term free -> LocalEnv free cvars ->
@@ -383,6 +408,9 @@ mutual
   ||| arguments for the object level variables the values mention
   mkSpecialised : {auto c : Ref Ctxt Defs} ->
                   {auto q : Ref QVar Int} ->
+            {auto m : Ref MD Metadata} -> {auto u : Ref UST UState} ->
+            {auto s : Ref Syn SyntaxInfo} -> {auto o : Ref ROpts REPLOpts} ->
+            {auto dn : Ref StageDef Name} ->
                   FC -> Name -> GlobalDef ->
                   (metaPos : List Nat) ->
                   (vals : List (Nat, ClosedTerm)) ->
@@ -440,8 +468,7 @@ mutual
 
       eraseClause : Clause -> Core Clause
       eraseClause (MkClause env lhs rhs)
-          = do u <- newRef UST initUState
-               lhs' <- linearCheck fc linear True env lhs
+          = do lhs' <- linearCheck fc linear True env lhs
                rhs' <- linearCheck fc linear True env rhs
                pure (MkClause env lhs' rhs')
 
@@ -535,12 +562,15 @@ callsMixed tm
 ||| it belongs to: run all the splices, and insert the code they produce.
 export
 unstage : {auto c : Ref Ctxt Defs} ->
+          {auto m : Ref MD Metadata} -> {auto u : Ref UST UState} ->
+          {auto s : Ref Syn SyntaxInfo} -> {auto o : Ref ROpts REPLOpts} ->
           {vars : _} ->
-          Env Term vars -> Term vars -> Core (Term vars)
-unstage env tm
+          Name -> Env Term vars -> Term vars -> Core (Term vars)
+unstage def env tm
     = if not (hasSplice tm) && not !(callsMixed tm)
          then pure tm
          else do q <- newRef QVar 0
+                 dn <- newRef StageDef def
                  res <- stageTm {cvars = Scope.empty} None env env [] tm
                  logTerm "compile.stage" 5 "Staged" res
                  pure res

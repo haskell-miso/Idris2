@@ -443,6 +443,7 @@ updateFExports ((n, conv) :: ns)
          put Ctxt ({ foreignExports $= insert n conv } defs)
          updateFExports ns
 
+export
 getNSas : (String, (ModuleIdent, Bool, Namespace)) ->
           (ModuleIdent, Namespace)
 getNSas (a, (b, c, d)) = (b, d)
@@ -568,6 +569,16 @@ getIncData : String -> Ref Bin Binary ->
 getIncData file b
     = do ignore $ getImportHashes file b
          fromBuf -- `incData`
+
+||| The modules which a TTC file imports (reading only the start of the file)
+export
+readImportList : (fname : String) -> Core (List (ModuleIdent, Bool, Namespace))
+readImportList fname
+    = do Right buffer <- coreLift $ readFromFile fname
+               | Left err => throw (InternalError (fname ++ ": " ++ show err))
+         b <- newRef Bin buffer
+         ignore $ getIncData fname b
+         fromBuf -- `imported`
 
 export
 readTotalReq : (fileName : String) -> -- file containing the module

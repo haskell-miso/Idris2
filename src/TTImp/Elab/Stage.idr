@@ -78,18 +78,26 @@ requireStage fc what s
                            Just s' => unless (s == s') $
                                          throw (stageMismatch fc what s s')
 
--- The stage of the local variable at the given position (from the outside)
--- of the environment
-varStageAt : Name -> (pos : Nat) -> StageState -> Maybe Stage
-varStageAt n pos st = findFrame (frames st)
+-- 'captured' says whether the variable can be one captured by a nested
+-- definition (whose stages are in baseVars): not if it shadows another
+-- variable of the same name
+varStageAtIn : (captured : Bool) -> Name -> (pos : Nat) -> StageState -> Maybe Stage
+varStageAtIn captured n pos st = findFrame (frames st)
   where
     findFrame : List (Nat, Stage) -> Maybe Stage
     findFrame ((len, s) :: fs)
         = if len <= pos then Just s else findFrame fs
     findFrame []
-        = case lookup n (baseVars st) of
+        = case (if captured then lookup n (baseVars st) else Nothing) of
                Just s => Just s
                Nothing => base st
+
+-- The stage of the local variable at the given position (from the outside)
+-- of the environment
+varStageAt : Name -> (pos : Nat) -> StageState -> Maybe Stage
+varStageAt n pos st = varStageAtIn True n pos st
+
+
 
 ||| The stage of the local variable 'n' with the given de Bruijn index
 export
@@ -97,7 +105,23 @@ localStage : {auto u : Ref UST UState} ->
              (vars : Scope) -> Name -> (idx : Nat) -> Core (Maybe Stage)
 localStage vars n idx
     = do st <- getStageState
-         pure (varStageAt n (minus (length vars) (S idx)) st)
+         let pos = minus (length vars) (S idx)
+         -- the outermost variable of this name is the captured one
+         let first = firstPos 0 (reverse (toList vars))
+         -- a case block renames a captured variable that a pattern rebinds
+         -- (to MN x i, see TTImp.Elab.Case): then the name is the pattern's
+         let renamed = case n of
+                            UN un => any (isRenamed (displayUserName un)) (toList vars)
+                            _ => False
+         pure (varStageAtIn (not renamed && maybe True (== pos) first) n pos st)
+  where
+    isRenamed : String -> Name -> Bool
+    isRenamed x (MN y _) = x == y
+    isRenamed _ _ = False
+
+    firstPos : Nat -> List Name -> Maybe Nat
+    firstPos i [] = Nothing
+    firstPos i (x :: xs) = if x == n then Just i else firstPos (S i) xs
 
 ||| Check that a local variable is used at the stage it was bound at.
 ||| Uses in erased positions (e.g. types in object code) are always fine,
@@ -135,8 +159,16 @@ registerNested n env
               let outer = reverse vars -- outermost first
               let stages = zipWith (\p, x => varStageAt x p st)
                                    [0 .. length outer] outer
+              -- the names of the variables, and the names they get in a
+              -- case block where a pattern rebinds them (TTImp.Elab.Case)
+              let inner = reverse (zip outer stages)
+              let renamed = mapMaybe (\ (i, (x, s)) =>
+                                         case x of
+                                              UN un => map (MN (displayUserName un) (cast i),) s
+                                              _ => Nothing)
+                                     (zip [0 .. length inner] inner)
               let named = fromList (mapMaybe (\ (x, s) => map (x,) s)
-                                             (zip outer stages))
+                                             (zip outer stages) ++ renamed)
               putStageState ({ nested $= insert n (body, named, stages) } st)
 
 ||| Check that a global name is used at a stage where it exists
@@ -184,24 +216,50 @@ noStageCheck act
 ||| Remember the current quotation/splice frames, to restore them when running
 ||| a delayed elaborator
 export
-saveFrames : {auto u : Ref UST UState} -> Core (List (Nat, Stage))
-saveFrames = frames <$> getStageState
+Frames : Type
+Frames = (List (Nat, Stage), List Bool)
 
 export
-withFrames : {auto u : Ref UST UState} -> List (Nat, Stage) -> Core a -> Core a
-withFrames fs act
+saveFrames : {auto u : Ref UST UState} -> Core Frames
+saveFrames = do st <- getStageState
+                pure (frames st, quoteKinds st)
+
+export
+withFrames : {auto u : Ref UST UState} -> Frames -> Core a -> Core a
+withFrames (fs, qs) act
     = do st <- getStageState
-         putStageState ({ frames := fs } st)
-         res <- catch act (\err => do updateStageState { frames := frames st }
+         putStageState ({ frames := fs, quoteKinds := qs } st)
+         res <- catch act (\err => do updateStageState { frames := frames st,
+                                                         quoteKinds := quoteKinds st }
                                       throw err)
-         updateStageState { frames := frames st }
+         updateStageState { frames := frames st, quoteKinds := quoteKinds st }
          pure res
+
+||| Run an elaborator inside a quotation of the given kind (True: Low)
+export
+inQuoteKind : {auto u : Ref UST UState} -> Bool -> Core a -> Core a
+inQuoteKind low act
+    = do st <- getStageState
+         let qs = quoteKinds st
+         putStageState ({ quoteKinds := low :: qs } st)
+         res <- catch act (\err => do updateStageState { quoteKinds := qs }
+                                      throw err)
+         updateStageState { quoteKinds := qs }
+         pure res
+
+||| Is the innermost quotation we are in a quotation of closure free code?
+export
+inLowQuote : {auto u : Ref UST UState} -> Core Bool
+inLowQuote = do st <- getStageState
+                pure (case quoteKinds st of
+                           (b :: _) => b
+                           [] => False)
 
 ||| Does a term mention 'Code', other than inside a splice? (A type that does
 ||| is a meta level type.)
 export
 mentionsCode : Term vars -> Bool
-mentionsCode (Ref _ _ n) = n == codeName
+mentionsCode (Ref _ _ n) = isCodeTyName n
 mentionsCode (Meta _ _ _ args) = any mentionsCode args
 mentionsCode (Bind _ _ b sc)
     = mentionsCode (binderType b) || mentionsCode sc ||
@@ -224,9 +282,10 @@ isMetaType : {vars : _} ->
              {auto c : Ref Ctxt Defs} -> Env Term vars -> Term vars -> Core Bool
 isMetaType env ty
     = do defs <- get Ctxt
-         -- Only if 'Code' exists at all
-         Just _ <- lookupCtxtExact codeName (gamma defs)
-              | Nothing => pure False
+         -- Only if 'Code' or 'Low' exists at all
+         False <- pure (isNothing !(lookupCtxtExact codeName (gamma defs)) &&
+                        isNothing !(lookupCtxtExact lowName (gamma defs)))
+              | True => pure False
          if mentionsCode !(toFullNames ty)
             then pure True
             else do nty <- normalise defs env ty

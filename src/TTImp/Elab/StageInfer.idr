@@ -339,6 +339,19 @@ needsSplice nest env tm exp
                               _ => pure Nothing
               _ => pure Nothing
 
+-- Is this a meta level variable of type 'Code a' (or 'Low a') applied to
+-- arguments?
+codeApplied : {vars : _} ->
+              {auto c : Ref Ctxt Defs} ->
+              {auto u : Ref UST UState} ->
+              NestedNames vars -> Env Term vars -> RawImp -> Core Bool
+codeApplied nest env tm
+    = do let (hd, nargs) = getHead tm Z
+         if nargs == 0 then pure False else
+           do Just info <- headInfo nest env hd nargs
+                   | Nothing => pure False
+              pure (info.isCodeVal && info.stage == Just SMeta)
+
 isExplicitStaging : RawImp -> Bool
 isExplicitStaging (IStageQuote {}) = True
 isExplicitStaging (IUnquote {}) = True
@@ -366,9 +379,10 @@ insertStageCoercion nest env (IAlternative fc alt alts) exp
 insertStageCoercion nest env tm exp
     = if isExplicitStaging tm then pure tm else
       do defs <- get Ctxt
-         -- Only if 'Code' is around at all
-         Just _ <- lookupCtxtExact codeName (gamma defs)
-              | Nothing => pure tm
+         -- Only if 'Code' or 'Low' is around at all
+         False <- pure (isNothing !(lookupCtxtExact codeName (gamma defs)) &&
+                        isNothing !(lookupCtxtExact lowName (gamma defs)))
+              | True => pure tm
          st <- getStageState
          cur <- currentStage
          log "elab.stage" 10 $ "Considering " ++ show tm ++ " at stage " ++ show cur ++ " active " ++ show (active st)
@@ -378,6 +392,13 @@ insertStageCoercion nest env tm exp
          let fc = getFC tm
          case cur' of
               Just SMeta =>
+                 -- Code applied to arguments can't be meta level code: it's
+                 -- object code, whatever the expected type is (e.g. the
+                 -- argument of 'pure', which isn't known yet)
+                 if !(codeApplied nest env tm)
+                    then do log "elab.stage" 5 $ "Inserting quotation around " ++ show tm
+                            pure (IStageQuote fc tm)
+                    else
                  do Just expty <- pure exp
                          | Nothing => pure tm
                     Just _ <- isCodeNF !(getNF expty)

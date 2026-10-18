@@ -140,12 +140,27 @@ ClosedTerm = Term []
 ||| The type of object level code, 'Language.Staged.Code : Type -> Type'
 export
 codeName : Name
-codeName = NS stagedNS (UN (Basic "Code"))
+codeName = NS (mkNamespace "Language.Staged.Code") (UN (Basic "Code"))
 
 ||| 'Code ty'
 export
 codeType : FC -> Term vars -> Term vars
 codeType fc ty = App fc (Ref fc (TyCon 1) codeName) ty
+
+||| The type of closure free object level code, 'Language.Staged.Low.Low'
+export
+lowName : Name
+lowName = NS lowNS (UN (Basic "Low"))
+
+||| A name in 'Language.Staged.Low'
+export
+lowLibName : String -> Name
+lowLibName s = NS lowNS (UN (Basic s))
+
+||| Is this (full) name a type of object code, 'Code' or 'Low'?
+export
+isCodeTyName : Name -> Bool
+isCodeTyName n = n == codeName || n == lowName
 
 ------------------------------------------------------------------------
 -- Weakening
