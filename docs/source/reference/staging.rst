@@ -21,7 +21,8 @@ to contain no trace of the meta level: abstractions such as higher order
 functions, interpreters or type classes used at the meta level cost nothing
 at run time.
 
-To use staging, import ``Language.Staged`` from ``base``.
+To use staging, import ``Language.Staged`` from ``base`` (and
+``Language.Staged.Low`` for closure-free code, see below).
 
 Code, quotations and splices
 ============================
@@ -163,6 +164,109 @@ paper, which can insert object level ``let`` bindings:
 It also provides binding time improvement between ``Code (a -> b)`` and
 ``Code a -> Code b`` (``up`` and ``down``).
 
+Closure-free code: ``Low``
+==========================
+
+``Language.Staged.Low`` adds the closure-free object language of the ICFP 2024
+paper. ``Low a`` is a second kind of code, next to ``Code a``: the same
+quotations and splices build it, and a quotation is ``Low`` code when its
+type is ``Low a`` (otherwise it is ``Code``). Low code is a first order,
+strict, monomorphic subset of Idris:
+
+* values have *value types*: the primitive types, and data types whose
+  fields are value types (no functions in data, no ``Code``);
+* functions are first order. Their arguments are values, so no closures are
+  ever needed at run time;
+* ``let`` and function arguments are evaluated first (call by value);
+* global functions used in low code are inlined. A recursive one becomes a
+  local recursive function, specialised to the arguments that are known at
+  compile time (such as a function argument of ``map``). Constructors,
+  primitives, foreign functions and local definitions are used as they are.
+
+.. code-block:: idris
+
+    import Language.Staged.Low
+
+    power : Nat -> Low Int -> Low Int
+    power Z x = [|| 1 ||]
+    power (S k) x = [|| ~x * ~(power k x) ||]
+
+    cube : Int -> Int
+    cube x = ~(power 3 [|| x ||])     -- low code runs as ordinary code
+
+    -- a loop: a recursive low function
+    sumSq : Low Int -> Low Int
+    sumSq n = runGen $ do
+      go <- genRecNamed "go" $ \go => [|| \i, acc => if i > ~n then acc else ~go (i + 1) (acc + i * i) ||]
+      pure [|| ~go 1 0 ||]
+
+Only low code can be spliced into low code. The implicit syntax works for
+``Low`` as for ``Code``: ``sumSquares = sumSq`` and
+``\n => runGen $ do go <- genRecNamed "go" $ \go => \i, acc => ...`` need no
+annotations.
+
+A generator which is polymorphic in a type used in low code needs a
+``LowRep a`` constraint, which the compiler solves for every concrete type:
+
+.. code-block:: idris
+
+    twice : LowRep a => Low (a -> a) -> Low a -> Low a
+    twice f x = genLetNamed "y" x $ \y => [|| ~f (~f ~y) ||]
+
+``Gen`` (with ``gen``, ``genRec`` and ``named``) inserts lets and local
+recursive functions, so the paper's examples carry over: pull streams whose
+pipelines compile to a single loop, and monads by binding time improvement.
+See ``tests/idris2/staging/staging011``.
+
+Reflection and code generators
+------------------------------
+
+Low code can also be *reflected*: ``reflect : Low a -> LowProg`` gives a
+first order syntax tree, with the type of every binder, after call saturation
+(lambda lifting style: every call has all its arguments) and simplification.
+It is a starting point for code generators written in Idris.
+``lowPretty`` shows a program, and ``Language.Staged.Low.C.toC`` is an example
+generator to C:
+
+.. code-block:: idris
+
+    import Language.Staged.Low.C
+
+    sumSqLow : Low (Int -> Int)
+    sumSqLow = [|| \n => ~(sumSq [|| n ||]) ||]
+
+    main : IO ()
+    main = putStr ~(lowString (toC "sumsq" (reflect sumSqLow)))
+
+The C program is computed at compile time and spliced in as a string:
+
+.. code-block:: c
+
+    static int64_t go(int64_t n, int64_t i, int64_t acc) {
+      int64_t r_0;
+      switch ((i > n)) {
+      case 0: {
+      r_0 = go(n, (i + 1), (acc + (i * i))); break; }
+      default: {
+      r_0 = acc; break; }
+      }
+      return r_0;
+    }
+
+    int64_t sumsq(int64_t n) {
+      return go(n, 1, 0);
+    }
+
+Errors in low code point at the term that is not low code:
+
+.. code-block:: none
+
+    higher : Low ((Int -> Int) -> Int)
+    higher = [|| \g => g 1 ||]
+
+    Error: low code: the lambda bound variable g must have a value type
+    (first order data), not Int -> Int
+
 Inspecting the output
 =====================
 
@@ -180,7 +284,11 @@ Limitations
 
 * There is no stage polymorphism beyond definitions that are usable at both
   stages. A function can't be generic over whether its argument is code.
-* Object level code is ordinary Idris. There is no closure-free target
-  language or join point support yet.
+* ``Code`` is ordinary Idris. ``Low`` code is closure free, but there is no
+  support for join points beyond the inlining of local functions which are
+  called once.
+* The type of a recursive generator (``genRec``) can need an annotation when
+  it is only determined by a later use, as unification in Idris can't always
+  find it from the order in which the code is checked.
 * A meta level argument of a specialised local function must be a variable,
   not a pattern.
