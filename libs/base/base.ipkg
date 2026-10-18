@@ -119,6 +119,7 @@ modules = Control.App,
           Language.Staged.Code,
           Language.Staged.Low,
           Language.Staged.Low.C,
+          Language.Staged.Low.JS,
           Language.Reflection.TT,
           Language.Reflection.TTImp,
 

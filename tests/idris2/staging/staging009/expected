@@ -33,6 +33,20 @@ static int64_t go(int64_t n, int64_t i, int64_t acc) {
 int64_t sumsq(int64_t n) {
   return go(n, 1, 0);
 }
+---- sumSq, JavaScript
+function sumsq(n) {
+  function go(i, acc) {
+    let r_0;
+    switch ((i > n ? 1 : 0)) {
+    case 0: {
+    r_0 = go((i + 1), (acc + (i * i))); break; }
+    default: {
+    r_0 = acc; break; }
+    }
+    return r_0;
+  }
+  return go(1, 0);
+}
 ---- scaledArea, reflected
 -- type: Double -> Shape -> Double
 -- data Shape = Circle Double | Rect Double Double
@@ -81,6 +95,31 @@ double scaled_area(double k, struct Shape* s) {
               0 => go r
               _ => Just x
   in go xs
+---- firstBig, JavaScript
+// data List #0 = Nil | (::) #0 List #0
+// data Maybe #0 = Nothing | Just #0
+function firstBig(n, xs) {
+  function go(l) {
+    let r_0;
+    switch (l[0]) {
+    case 0: {
+    r_0 = [0]; break; }
+    case 1: {
+    const x = l[1];
+    const r = l[2];
+    let r_1;
+    switch ((n < x ? 1 : 0)) {
+    case 0: {
+    r_1 = go(r); break; }
+    default: {
+    r_1 = [1, x]; break; }
+    }
+    r_0 = r_1; break; }
+    }
+    return r_0;
+  }
+  return go(xs);
+}
 ---- firstBig, C
 #include <stdint.h>
 #include <stdlib.h>

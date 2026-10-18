@@ -8,7 +8,6 @@ LOG specialise:5: Attempting to specialise:
 LOG specialise:5: New patterns for _PE.PE_smult_1:
 (_PE.PE_smult_1 ${_pe:1}) = (($resolved1 (Prelude.Types.S (Prelude.Types.S (Prelude.Types.S Prelude.Types.Z)))) {_pe:1})
 LOG specialise:5: New RHS: (Prelude.Types.plus {_pe:1}[0] (Prelude.Types.plus {_pe:1}[0] {_pe:1}[0]))
-LOG specialise:5: Already specialised _PE.PE_smult_1
 /* Main.main : IO () */
 function Main_main($0) {
  const $1 = Prelude_IO_prim__getStr($0);
@@ -25,7 +24,6 @@ LOG specialise:5: New patterns for _PE.PE_fold_1:
 LOG specialise:5: Already specialised _PE.PE_fold_1
 LOG specialise:5: Already specialised _PE.PE_fold_1
 LOG specialise:5: New RHS: (alg[0] (Prelude.Types.bimap (Builtin.Pair a[1] a[1]) (Builtin.Pair (Desc.Mu (Desc.Sum Desc.Stop (Desc.Prod Desc.Rec Desc.Rec))) (Desc.Mu (Desc.Sum Desc.Stop (Desc.Prod Desc.Rec Desc.Rec)))) Builtin.Unit Builtin.Unit (Prelude.Basics.id Builtin.Unit) \({arg:4} : (Builtin.Pair (Desc.Mu (Desc.Sum Desc.Stop (Desc.Prod Desc.Rec Desc.Rec))) (Desc.Mu (Desc.Sum Desc.Stop (Desc.Prod Desc.Rec Desc.Rec))))) => (Prelude.Types.bimap a[2] (Desc.Mu (Desc.Sum Desc.Stop (Desc.Prod Desc.Rec Desc.Rec))) a[2] (Desc.Mu (Desc.Sum Desc.Stop (Desc.Prod Desc.Rec Desc.Rec))) (_PE.PE_fold_1 a[2] alg[1]) (_PE.PE_fold_1 a[2] alg[1]) {arg:4}[0]) t[2]))
-LOG specialise:5: Already specialised _PE.PE_fold_1
 1/1: Building Desc2 (Desc2.idr)
 LOG specialise.declare:5: Specialising Main.fold ($resolved1) -> _PE.PE_fold_1 by (0, Static Prelude.Types.Nat), (1, Static Prelude.Basics.List), (2, Static (Prelude.Interfaces.MkFunctor Prelude.Basics.List \{0 b : Type} => \{0 a : Type} => \(func : ({arg:1} : a[0]) -> b[2]) => \({arg:2} : (Prelude.Basics.List a[1])) => (Prelude.Types.List.mapImpl b[3] a[2] func[1] {arg:2}[0]))), (3, Dynamic)
 LOG specialise:3: Specialised type _PE.PE_fold_1: ({arg:3} : ({arg:4} : (Prelude.Basics.List Prelude.Types.Nat)) -> Prelude.Types.Nat) -> ({arg:5} : (Main.Mu Prelude.Basics.List)) -> Prelude.Types.Nat
@@ -41,11 +39,7 @@ LOG specialise:5: New patterns for _PE.PE_fold_2:
 ((_PE.PE_fold_2 alg) ((Main.MkMu [f = Prelude.Basics.List]) t)) = (alg ((((((Prelude.Interfaces.(<$>) [b = Prelude.Types.Nat]) [a = (Main.Mu Prelude.Basics.List)]) [f = Prelude.Basics.List]) [{conArg:1} = ((Prelude.Interfaces.MkFunctor [f = Prelude.Basics.List]) (%lam Rig0 Implicit (Just b) %type (%lam Rig0 Implicit (Just a) %type (%lam RigW Explicit (Just func) (%pi RigW Explicit (Just {arg:1}) a b) (%lam RigW Explicit (Just {arg:2}) (Prelude.Basics.List a) (((((Prelude.Types.List.mapAppend [a = a]) [b = b]) (Prelude.Basics.Lin [a = b])) func) {arg:2}))))))]) ((((Main.fold [a = Prelude.Types.Nat]) [f = Prelude.Basics.List]) [fun = ((Prelude.Interfaces.MkFunctor [f = Prelude.Basics.List]) (%lam Rig0 Implicit (Just b) %type (%lam Rig0 Implicit (Just a) %type (%lam RigW Explicit (Just func) (%pi RigW Explicit (Just {arg:1}) a b) (%lam RigW Explicit (Just {arg:2}) (Prelude.Basics.List a) (((((Prelude.Types.List.mapAppend [a = a]) [b = b]) (Prelude.Basics.Lin [a = b])) func) {arg:2}))))))]) alg)) t))
 LOG specialise:5: Already specialised _PE.PE_fold_2
 LOG specialise:5: New RHS: (alg[0] (Prelude.Types.List.mapAppend (Main.Mu Prelude.Basics.List) Prelude.Types.Nat (Prelude.Basics.Lin Prelude.Types.Nat) (_PE.PE_fold_2 alg[0]) t[1]))
-LOG specialise:5: Already specialised _PE.PE_fold_2
 LOG specialise:5: New RHS: (alg[0] (Prelude.Types.List.mapAppend (Main.Mu Prelude.Basics.List) Prelude.Types.Nat (Prelude.Basics.Lin Prelude.Types.Nat) (_PE.PE_fold_2 alg[0]) t[1]))
-LOG specialise:5: Already specialised _PE.PE_fold_1
-LOG specialise:5: New RHS: (alg[0] (Prelude.Types.List.mapAppend (Main.Mu Prelude.Basics.List) Prelude.Types.Nat (Prelude.Basics.Lin Prelude.Types.Nat) (_PE.PE_fold_2 alg[0]) t[1]))
-LOG specialise:5: Already specialised _PE.PE_fold_1
 1/1: Building Identity (Identity.idr)
 LOG specialise.declare:5: Specialising Main.identity ($resolved1) -> _PE.PE_identity_1 by (0, Static Prelude.Types.Nat), (1, Dynamic)
 LOG specialise:3: Specialised type _PE.PE_identity_1: ({arg:1} : (Prelude.Basics.List Prelude.Types.Nat)) -> (Prelude.Basics.List Prelude.Types.Nat)
@@ -58,7 +52,6 @@ LOG specialise:5: New patterns for _PE.PE_identity_1:
 LOG specialise:5: New RHS: (Prelude.Basics.Nil Prelude.Types.Nat)
 LOG specialise:5: Already specialised _PE.PE_identity_1
 LOG specialise:5: New RHS: (Prelude.Basics.(::) Prelude.Types.Nat x[1] (_PE.PE_identity_1 xs[0]))
-LOG specialise:5: Already specialised _PE.PE_identity_1
 LOG compiler.identity:5: found identity flag for: _PE.PE_identity_1, 0
 	old def: Just [{arg:2}]: (%case !{arg:2} [(%concase [nil] _builtin.NIL Just 0 [] (%con [nil] _builtin.NIL Just 0 [])), (%concase [cons] _builtin.CONS Just 1 [{e:1}, {e:2}] (%con [cons] _builtin.CONS Just 1 [!{e:1}, (_PE.PE_identity_1 [!{e:2}])]))] Nothing)
 LOG compiler.identity:5: 	new def: [{arg:2}]: !{arg:2}

@@ -2,6 +2,7 @@ module LowReflect
 
 import Language.Staged.Low
 import Language.Staged.Low.C
+import Language.Staged.Low.JS
 
 -- The sum of the squares of 1 .. n, as a loop
 sumSq : Low (Int -> Int)
@@ -41,12 +42,16 @@ main = do
   putStr ~(lowString (lowPretty (reflect sumSq)))
   putStrLn "---- sumSq, C"
   putStr ~(lowString (toC "sumsq" (reflect sumSq)))
+  putStrLn "---- sumSq, JavaScript"
+  putStr ~(lowString (toJS "sumsq" (reflect sumSq)))
   putStrLn "---- scaledArea, reflected"
   putStr ~(lowString (lowPretty (reflect scaledArea)))
   putStrLn "---- scaledArea, C"
   putStr ~(lowString (toC "scaled_area" (reflect scaledArea)))
   putStrLn "---- firstBig, reflected"
   putStr ~(lowString (lowPretty (reflect firstBig)))
+  putStrLn "---- firstBig, JavaScript"
+  putStr ~(lowString (toJS "firstBig" (reflect firstBig)))
   putStrLn "---- firstBig, C"
   putStr ~(lowString (toC "first_big" (reflect firstBig)))
   putStrLn "---- run"

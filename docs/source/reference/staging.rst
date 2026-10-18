@@ -225,8 +225,8 @@ Low code can also be *reflected*: ``reflect : Low a -> LowProg`` gives a
 first order syntax tree, with the type of every binder, after call saturation
 (lambda lifting style: every call has all its arguments) and simplification.
 It is a starting point for code generators written in Idris.
-``lowPretty`` shows a program, and ``Language.Staged.Low.C.toC`` is an example
-generator to C:
+``lowPretty`` shows a program, and ``Language.Staged.Low.C.toC`` and
+``Language.Staged.Low.JS.toJS`` are example generators to C and JavaScript:
 
 .. code-block:: idris
 
