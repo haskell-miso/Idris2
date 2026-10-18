@@ -34,7 +34,7 @@ filterP : (Low a -> Low Bool) -> Pull (Low a) -> Pull (Low a)
 filterP p (MkPull s0 step) = MkPull s0 $ \s => do
   st <- step s
   case st of
-       Yield x s' => MkGen $ \k => [|| if ~(p x) then ~(k (Yield x s')) else ~(k (Skip s')) ||]
+       Yield a s' => MkGen $ \k => [|| if ~(p a) then ~(k (Yield a s')) else ~(k (Skip s')) ||]
        _ => pure st
 
 -- The consumer: a loop, a recursive low function of the accumulator and the

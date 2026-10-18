@@ -78,6 +78,36 @@ requireStage fc what s
                            Just s' => unless (s == s') $
                                          throw (stageMismatch fc what s s')
 
+-- The key recording that a case block may rename a captured variable x (at
+-- index i of the environment) to MN x i, when a pattern rebinds x
+export
+renameKey : String -> Int -> Name
+renameKey x i = MN ("rename:" ++ x) i
+
+||| Is the name a variable bound by a pattern of a case block, which rebinds a
+||| captured variable of the same name (which the case block renames, see
+||| TTImp.Elab.Case)?
+export
+renamedIn : NameMap a -> List Name -> Name -> Bool
+renamedIn captured vars (UN un)
+    = any (\v => case v of
+                       MN y i => y == displayUserName un &&
+                                 isJust (lookup (renameKey y i) captured) &&
+                                 -- (and not a variable of that name that
+                                 -- an outer case block renamed)
+                                 isNothing (lookup v captured)
+                       _ => False) vars
+renamedIn _ _ _ = False
+
+||| The stage of a captured variable, by its name in a nested definition
+export
+capturedStage : NameMap a -> Name -> Maybe a
+capturedStage captured n@(MN y i)
+    = case lookup n captured of
+           Just s => Just s
+           Nothing => lookup (renameKey y i) captured
+capturedStage captured n = lookup n captured
+
 -- 'captured' says whether the variable can be one captured by a nested
 -- definition (whose stages are in baseVars): not if it shadows another
 -- variable of the same name
@@ -88,9 +118,11 @@ varStageAtIn captured n pos st = findFrame (frames st)
     findFrame ((len, s) :: fs)
         = if len <= pos then Just s else findFrame fs
     findFrame []
-        = case (if captured then lookup n (baseVars st) else Nothing) of
+        = case (if captured then capturedStage (baseVars st) n else Nothing) of
                Just s => Just s
                Nothing => base st
+
+
 
 -- The stage of the local variable at the given position (from the outside)
 -- of the environment
@@ -110,15 +142,9 @@ localStage vars n idx
          let first = firstPos 0 (reverse (toList vars))
          -- a case block renames a captured variable that a pattern rebinds
          -- (to MN x i, see TTImp.Elab.Case): then the name is the pattern's
-         let renamed = case n of
-                            UN un => any (isRenamed (displayUserName un)) (toList vars)
-                            _ => False
-         pure (varStageAtIn (not renamed && maybe True (== pos) first) n pos st)
+         pure (varStageAtIn (not (renamedIn (baseVars st) (toList vars) n) &&
+                             maybe True (== pos) first) n pos st)
   where
-    isRenamed : String -> Name -> Bool
-    isRenamed x (MN y _) = x == y
-    isRenamed _ _ = False
-
     firstPos : Nat -> List Name -> Maybe Nat
     firstPos i [] = Nothing
     firstPos i (x :: xs) = if x == n then Just i else firstPos (S i) xs
@@ -162,9 +188,9 @@ registerNested n env
               -- the names of the variables, and the names they get in a
               -- case block where a pattern rebinds them (TTImp.Elab.Case)
               let inner = reverse (zip outer stages)
-              let renamed = mapMaybe (\ (i, (x, s)) =>
+              let renamed = concat $ mapMaybe (\ (i, (x, s)) =>
                                          case x of
-                                              UN un => map (MN (displayUserName un) (cast i),) s
+                                              UN un => map (\s' => [(renameKey (displayUserName un) (cast i), s')]) s
                                               _ => Nothing)
                                      (zip [0 .. length inner] inner)
               let named = fromList (mapMaybe (\ (x, s) => map (x,) s)

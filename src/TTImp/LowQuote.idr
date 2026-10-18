@@ -37,6 +37,8 @@ import Core.Unify
 import Core.UnifyState
 import Core.Value
 
+import TTImp.Elab.Stage
+
 import Data.List
 
 import Libraries.Data.List.SizeOf
@@ -1079,10 +1081,7 @@ lowerClause fc def metaDef varStages (MkClause env lhs rhs)
     -- a case block renames a captured variable that a pattern rebinds (to
     -- MN x i, see TTImp.Elab.Case): then the name is the pattern's
     shadowed : List Name -> Name -> Bool
-    shadowed all (UN un) = any (\n => case n of
-                                          MN y _ => y == displayUserName un
-                                          _ => False) all
-    shadowed _ _ = False
+    shadowed all n = renamedIn varStages all n
 
     kindsOf : {vs : _} -> Env Term vs -> List VarKind
     kindsOf env = go (toList vs) env
@@ -1090,7 +1089,7 @@ lowerClause fc def metaDef varStages (MkClause env lhs rhs)
         go : {vs' : _} -> List Name -> Env Term vs' -> List VarKind
         go all {vs' = []} [] = []
         go all {vs' = x :: xs} (b :: bs)
-            = (case (if shadowed all x then Nothing else lookup x varStages) of
+            = (case (if shadowed all x then Nothing else capturedStage varStages x) of
                     Just SMeta => VMeta
                     Just SObj => if metaDef then VLowVar else VObj
                     Nothing => if metaDef then VMeta else VObj) :: go all bs
