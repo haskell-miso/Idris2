@@ -216,6 +216,29 @@ A generator which is polymorphic in a type used in low code needs a
     twice : LowRep a => Low (a -> a) -> Low a -> Low a
     twice f x = genLetNamed "y" x $ \y => [|| ~f (~f ~y) ||]
 
+An interface implemented for both a value type and its code gives one
+evaluator that is an interpreter or a compiler, depending on the type it is
+used at (``tests/idris2/staging/staging015``):
+
+.. code-block:: idris
+
+    Num (Low Int) where
+      a + b = [|| ~a + ~b ||]
+      a * b = [|| ~a * ~b ||]
+      fromInteger n = lowInt (fromInteger n)
+
+    eval : Num rep => Exp -> Env rep -> rep    -- one definition
+
+    interp : Exp -> Int -> Int                 -- at run time, rep = Int
+    compile : Exp -> Low (Int -> Int)          -- at compile time, rep = Low Int
+
+The choice can't be made by a value (e.g. a GADT ``Mode rep`` matched on in
+the evaluator), since a definition that builds low code in one of its cases
+is at the meta level, and so can't be used by the interpreter at run time.
+Stage inference reads ``x + y`` at type ``Low Int`` as meta level code when
+there is an implementation like ``Num (Low Int)``, and as object code
+otherwise.
+
 ``Gen`` (with ``gen``, ``genRec`` and ``named``) inserts lets and local
 recursive functions, so the paper's examples carry over: pull streams whose
 pipelines compile to a single loop, and monads by binding time improvement.

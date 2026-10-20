@@ -83,13 +83,13 @@ record HeadInfo where
   stage : Maybe Stage   -- Nothing: stage polymorphic, or unknown
   result : ResultKind   -- the result after the given arguments
   isCodeVal : Bool      -- the head itself has type 'Code a'
-  constrained : Bool    -- has auto implicit (interface) arguments
+  constrained : List Name -- its auto implicit (interface) arguments
 
 -- Classify the result of a function type after 'n' explicit arguments
 resultKind : {vars : _} ->
              {auto c : Ref Ctxt Defs} ->
-             Env Term vars -> Nat -> NF vars -> Core (ResultKind, Bool)
-resultKind env n ty = go n False ty
+             Env Term vars -> Nat -> NF vars -> Core (ResultKind, List Name)
+resultKind env n ty = go n [] ty
   where
     -- How many more explicit arguments until the result is 'Code'?
     codeAfter : Nat -> NF vars -> Core (Maybe Nat)
@@ -104,7 +104,7 @@ resultKind env n ty = go n False ty
     codeAfter m nf
         = if isJust !(isCodeNF nf) then pure (Just m) else pure Nothing
 
-    go : Nat -> Bool -> NF vars -> Core (ResultKind, Bool)
+    go : Nat -> List Name -> NF vars -> Core (ResultKind, List Name)
     go k cons nf@(NBind fc x (Pi _ _ Explicit aty) sc)
         = case k of
                Z => do Just m <- codeAfter Z nf
@@ -116,7 +116,10 @@ resultKind env n ty = go n False ty
     go k cons (NBind fc x (Pi _ _ AutoImplicit aty) sc)
         = do defs <- get Ctxt
              sc' <- sc defs (toClosure defaultOpts env (Erased fc Placeholder))
-             go k True sc'
+             iface <- case !(evalClosure defs aty) of
+                           NTCon _ i _ _ => pure [i]
+                           _ => pure []
+             go k (iface ++ cons) sc'
     go k cons (NBind fc x (Pi _ _ _ aty) sc)
         = do defs <- get Ctxt
              sc' <- sc defs (toClosure defaultOpts env (Erased fc Placeholder))
@@ -256,6 +259,34 @@ metaPrimVar nest env (IVar fc n)
          pure True
 metaPrimVar nest env _ = pure False
 
+-- Is there an implementation of the interface for code (Code a or Low a)?
+implementedForCode : {auto c : Ref Ctxt Defs} -> Name -> Core Bool
+implementedForCode iface
+    = do defs <- get Ctxt
+         iface' <- toFullNames iface -- (type hints are indexed by full name)
+         let hints = fromMaybe [] (lookup iface' (typeHints defs))
+         anyM forCode (map fst hints)
+  where
+    mentionsCode : Term vs -> Core Bool
+    mentionsCode tm
+        = case getFnArgs tm of
+               (Ref _ _ n, args) =>
+                   if isCodeTyName !(toFullNames n)
+                      then pure True
+                      else anyM mentionsCode args
+               _ => pure False
+
+    resultCode : Term vs -> Core Bool
+    resultCode (Bind _ _ (Pi {}) sc) = resultCode sc
+    resultCode tm = mentionsCode tm
+
+    forCode : Name -> Core Bool
+    forCode h
+        = do defs <- get Ctxt
+             Just gdef <- lookupCtxtExact h (gamma defs)
+                  | Nothing => pure False
+             resultCode (type gdef)
+
 -- Can this expression, checked against 'Code a' at the meta level, not have
 -- that type as it is? Then it's object code, and needs quoting.
 mustQuote : {vars : _} ->
@@ -288,7 +319,12 @@ mustQuote nest env tm
                        RCodeOver _ => pure True
                        RFunCode _ => pure False
                        RConcrete => pure True
-                       RVar => pure info.constrained
+                       RVar => -- e.g. x * y, at Code Int: object level,
+                               -- unless the interface is implemented for code
+                               -- (e.g. Num (Low Int))
+                               if null info.constrained
+                                  then pure False
+                                  else not <$> anyM implementedForCode info.constrained
                        RUnknown => pure False
 
 -- Application spines
