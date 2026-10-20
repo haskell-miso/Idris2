@@ -105,7 +105,9 @@ divDiv = [|| \a, b, c => ~(down $ do
 --------------------------------------------------------------------------
 -- Foreign C functions can be used in low code
 
-%foreign "C:sqrt,libm 6"
+-- libc 6 is the C library of the platform, which the Chez backend loads at
+-- startup (libm 6 only exists on Linux)
+%foreign "C:sqrt,libc 6"
 c_sqrt : Double -> Double
 
 hypot : Low (Double -> Double -> Double)
