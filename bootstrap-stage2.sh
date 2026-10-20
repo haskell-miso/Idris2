@@ -13,10 +13,11 @@ export LD_LIBRARY_PATH="${LD_LIBRARY_PATH:-"${BOOTSTRAP_PREFIX}/lib"}"
 export DYLD_LIBRARY_PATH="${DYLD_LIBRARY_PATH:-"${BOOTSTRAP_PREFIX}/lib"}"
 export IDRIS2_DATA="${IDRIS2_DATA:-"${BOOTSTRAP_PREFIX}/support"}"
 
+# The bootstrap compiler can't build the staging modules of base (2LTT)
 $MAKE bootstrap-libs IDRIS2_CG="$IDRIS2_CG" \
-    PREFIX="$BOOTSTRAP_PREFIX" SCHEME="$SCHEME"
+    PREFIX="$BOOTSTRAP_PREFIX" SCHEME="$SCHEME" BASE_IPKG=bootstrap-base.ipkg
 $MAKE bootstrap-install IDRIS2_CG="$IDRIS2_CG" \
-    PREFIX="$BOOTSTRAP_PREFIX" SCHEME="$SCHEME"
+    PREFIX="$BOOTSTRAP_PREFIX" SCHEME="$SCHEME" BASE_IPKG=bootstrap-base.ipkg
 
 # Now rebuild everything properly
 $MAKE clean-libs IDRIS2_BOOT="$BOOTSTRAP_PREFIX/bin/idris2"
