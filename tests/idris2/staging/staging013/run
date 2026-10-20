@@ -1,0 +1,5 @@
+. ../../../testutils.sh
+
+check MetaMain.idr
+run SpliceMain.idr
+idris2 --exec gen MetaExec.idr

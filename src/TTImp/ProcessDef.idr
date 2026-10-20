@@ -921,9 +921,17 @@ processDef opts nest env fc n_in cs_in
          -- Two-level type theory: set up stage checking for this definition
          oldst <- getStageState
          let nestedInfo = lookup (Resolved nidx) (nested oldst)
+         -- 'main' runs at run time, so it is object level code: meta level
+         -- code is never compiled
+         staged <- pure (isJust !(lookupCtxtExact codeName (gamma defs)) ||
+                         isJust !(lookupCtxtExact lowName (gamma defs)))
          let base0 = case defStage gdef of
                           Just DMeta => Just SMeta
-                          _ => maybe Nothing fst nestedInfo
+                          _ => case nestedInfo of
+                                    Just (s, _) => s
+                                    Nothing => if staged && isEntryPoint n
+                                                  then Just SObj
+                                                  else Nothing
          putStageState ({ active := True,
                           base := base0,
                           baseVars := maybe empty (fst . snd) nestedInfo,
@@ -1002,6 +1010,10 @@ processDef opts nest env fc n_in cs_in
          when (not (elem InCase opts)) $
               compileRunTime fc atotal
   where
+    isEntryPoint : Name -> Bool
+    isEntryPoint (NS _ (UN (Basic "main"))) = True
+    isEntryPoint _ = False
+
     -- Two-level type theory: the stage of the definition we've just checked.
     -- 'envStages' are the stages of the variables a nested definition
     -- captures (outermost first)

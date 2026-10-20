@@ -308,6 +308,7 @@ getCompileDataWith exports doLazyAnnots phase_in tm_in
          let ns = keys (mergeWith const metas refs) ++ map fst exported
          log "compile.execute" 70 $
            "Found names: " ++ concat (intersperse ", " $ map show $ ns)
+         traverse_ checkRunTimeRoot ns
          tm <- toFullNames tm_in
          natHackNames' <- traverse toResolvedNames natHackNames
          -- make an array of Bools to hold which names we've found (quicker
@@ -393,6 +394,23 @@ getCompileDataWith exports doLazyAnnots phase_in tm_in
     lookupBackend (b :: bs) (n, exps) = case find (\(b', _) => b == b') exps of
         Just (_, exp) => Just (n, exp)
         Nothing => lookupBackend bs (n, exps)
+
+    -- Two-level type theory: meta level code only exists at compile time,
+    -- so it can't be run (as 'main', an export, or a REPL expression)
+    checkRunTimeRoot : Name -> Core ()
+    checkRunTimeRoot n
+        = do defs <- get Ctxt
+             Just gdef <- lookupCtxtExact n (gamma defs)
+                  | Nothing => pure ()
+             -- only functions: meta level types and constructors can still
+             -- appear in erased positions
+             let PMDef {} = definition gdef
+                  | _ => pure ()
+             when (isMetaStaged gdef) $
+               throw (GenericMsg gdef.location
+                        (show !(toFullNames gdef.fullname) ++
+                         " is meta level code, which only exists at compile time, so it can't be run." ++
+                         "\nUse a splice ~(...) to run it at compile time and insert the code it produces."))
 
     getExports : Defs -> Core (List (Name, String))
     getExports defs = traverse (\(n, exp) => pure (!(resolved defs.gamma n), exp)) $

@@ -1,0 +1,34 @@
+1/1: Building MetaMain (MetaMain.idr)
+Error: While processing right hand side of main. The meta level definition Language.Staged.Low.reflect is at the meta level (compile time), but it is used at the object level (run time).
+Use a splice ~(...) to run it and insert the code it produces.
+
+MetaMain:7:28--7:35
+ 3 |
+ 4 | -- main runs at run time, so it is object level code: the quotation (and the
+ 5 | -- meta program using it) needs a splice
+ 6 | main : IO ()
+ 7 | main = putStr (toC "unit" (reflect [|| () ||]))
+                                ^^^^^^^
+
+#include <stdint.h>
+#include <stdlib.h>
+#include <stdio.h>
+#include <string.h>
+#include <math.h>
+
+static inline double void2double(void* p) { double d; memcpy(&d, &p, sizeof d); return d; }
+static inline void* double2void(double d) { void* p = 0; memcpy(&p, &d, sizeof d); return p; }
+
+enum { Unit_MkUnit = 0 };
+
+
+int unit() {
+  return Unit_MkUnit;
+}
+Error: Main.gen is meta level code, which only exists at compile time, so it can't be run.
+Use a splice ~(...) to run it at compile time and insert the code it produces.
+
+MetaExec:5:1--5:12
+ 1 | gen
+     ^^^^^^^^^^^
+
