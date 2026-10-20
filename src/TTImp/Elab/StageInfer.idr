@@ -9,9 +9,10 @@
 |||
 ||| * At the meta level, an expression checked against 'Code a' which cannot
 |||   itself have that type is quoted: a literal, a lambda, an object level
-|||   variable, or an application whose head cannot return code (its result
-|||   is another type constructor, or a type variable constrained by an
-|||   interface, as in 'x * y'). Meta level code with a 'Code' result is
+|||   variable, a meta level variable of a primitive type (whose value
+|||   persists into the code as a literal), or an application whose head
+|||   cannot return code (its result is another type constructor, or a type
+|||   variable constrained by an interface, as in 'x * y'). Meta level code with a 'Code' result is
 |||   left alone, so that the meta level reading is used when it is possible.
 ||| * At the object level, a meta level variable or application whose result
 |||   is 'Code a' is spliced. A meta level variable of type 'Code (a -> b)'
@@ -234,6 +235,27 @@ isMetaNonCode nest env tm
                       _ => pure False
               _ => pure False
 
+-- Is this a meta level variable of a primitive type (e.g. 'n : Int')? It
+-- can't be code, but quoting it persists its value into the code (as a
+-- literal, see 'checkLocalStage')
+metaPrimVar : {vars : _} ->
+              {auto c : Ref Ctxt Defs} ->
+              {auto u : Ref UST UState} ->
+              NestedNames vars -> Env Term vars -> RawImp -> Core Bool
+metaPrimVar nest env (IVar fc n)
+    = do st <- getStageState
+         let True = active st && isNothing (lookup n (names nest))
+              | False => pure False
+         let Just (MkIsDefined {idx} _ lv) = defined n env
+              | Nothing => pure False
+         Just SMeta <- localStage vars n idx
+              | _ => pure False
+         defs <- get Ctxt
+         NPrimVal _ (PrT _) <- nf defs env (binderType (getBinder lv env))
+              | _ => pure False
+         pure True
+metaPrimVar nest env _ = pure False
+
 -- Can this expression, checked against 'Code a' at the meta level, not have
 -- that type as it is? Then it's object code, and needs quoting.
 mustQuote : {vars : _} ->
@@ -257,7 +279,9 @@ mustQuote nest env tm
               Just SObj => pure True -- object code used at the meta level
               Just SMeta =>
                   -- code applied to arguments is an object application
-                  pure ((info.isCodeVal && nargs > 0) || isOver info.result)
+                  if (info.isCodeVal && nargs > 0) || isOver info.result
+                     then pure True
+                     else pure (nargs == 0 && !(metaPrimVar nest env hd))
               Nothing =>
                   case info.result of
                        RCode => pure False

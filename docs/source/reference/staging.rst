@@ -118,6 +118,9 @@ The rules are:
 
 * An object level expression (a literal, lambda, constructor or object level
   function application) used where ``Code a`` is expected is **quoted**.
+  So is a meta level variable of a primitive type, by cross-stage
+  persistence: with ``n : Int``, ``n`` checked against ``Code Int`` is
+  ``[|| n ||]``. Other data needs ``lift``.
 * A meta level expression of type ``Code a`` used where an ``a`` is expected
   is **spliced**. Partially applied code, as in ``f y :: ys`` above, is
   spliced at the head.
